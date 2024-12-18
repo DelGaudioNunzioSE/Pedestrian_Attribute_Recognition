@@ -45,14 +45,14 @@ def my_track(video_path, tracker, show=False):
 
 
 
-video_path = './esercitazione/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
-tracker='./esercitazione/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
+video_path = './videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+tracker='./confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
 my_track(video_path, tracker, show)
 
 # Scrittura del file JSON
-file_path = './esercitazione/videos/data.json'
+file_path = './videos/data.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(data, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
