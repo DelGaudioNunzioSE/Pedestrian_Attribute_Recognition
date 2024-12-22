@@ -133,64 +133,32 @@ def plane_to_pixel(xy):
 
 
 
-
-
-# Lettura immagine con OpenCV
-image_file = "./test20241212.png"
-image = cv2.imread(image_file)
-
-
-
-# Dati iniziali
-x_real = np.array([-2.5, 0.5, 0.5, 4.6])
-y_real = np.array([13.41, 8.00, 13.00, 10.91])
-z_real = np.zeros_like(x_real)
-
-xt= 0
-yt= 0
-zt= 7.20  # Coordinate della camera
-thyaw = 0 * np.pi / 180  # Yaw (rotazione attorno a Z)
-thpitch = ((-32 * np.pi) / 180)  # Pitch (rotazione attorno a Y) (radianti)
-throll = 0 * np.pi / 180  # Roll (rotazione attorno a X)
-# Parametri immagine
-f = 0.003  # Distanza focale (m)
-s_w = 0.00498  # Larghezza sensore (m)
-s_h = 0.00374  # Altezza sensore (m)
-U = image.shape[1]   # Larghezza immagine (pixel)
-V = image.shape[0]  # Altezza immagine (pixel)
-
-print("larghezza ed altezza immagine:")
-print(U,V)
-
-
 # Disegna i punti sull'immagine
 
-for i in range(len(x_real)):
-    print("point:")
-    print(x_real[i],z_real[i], y_real[i])
+def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thyaw, thpitch, throll, focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
-    XYZ=real_to_camera(point_x=x_real[i], point_y=z_real[i], point_z=y_real[i], camera_x=xt, camera_y=zt, camera_z=yt, theta_x=thpitch, theta_z=0, theta_y=0)
+    print("larghezza ed altezza immagine:")
+    print(resolution_x,resolution_y)
+
+    for i in range(len(x_real)):
+        print("point:")
+        print(x_real[i],z_real[i], y_real[i])
+
+        XYZ=real_to_camera(point_x=x_real[i], point_y=z_real[i], point_z=y_real[i], camera_x=camera_x, camera_y=camera_z, camera_z=camera_y, theta_x=thpitch, theta_z=throll, theta_y=thyaw)
+        
+
+        xy=camera_to_plane(XYZ,focal=focal,resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
     
 
-    xy=camera_to_plane(XYZ,focal=f,resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
-  
-
-    u,v= plane_to_pixel(xy)
-    point = ((u), (v))
-    print("u e v sono:")
-    print(point)
+        u,v= plane_to_pixel(xy)
+        point = ((u), (v))
+        print("u e v sono:")
+        print(point)
 
 
-    cv2.circle(image, point, radius=5, color=(0, 0, 255), thickness=-1)  # Cerchi rossi
+        cv2.circle(image, point, radius=5, color=(0, 0, 255), thickness=-1)  # Cerchi rossi
 
-    print('-----------------------------------------------')
+        print('-----------------------------------------------')
 
+    return image
 
-
-# Salva e visualizza il risultato
-output_file = ".output_image.png"
-cv2.imwrite(output_file, image)
-
-cv2.imshow("Projected Points", image)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
