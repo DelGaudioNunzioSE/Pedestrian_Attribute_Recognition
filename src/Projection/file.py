@@ -9,7 +9,7 @@ def R_z(theta_z):
     Rz = np.array([
         [np.cos(theta_z), -np.sin(theta_z), 0,0],
         [np.sin(theta_z), np.cos(theta_z), 0, 0],
-        [0, 0, 1 ,0],
+        [0, 0, 1, 0],
         [0, 0, 0, 1]
     ])
     return Rz
@@ -18,7 +18,7 @@ def R_z(theta_z):
 def R_y(theta_y):
     Ry = np.array([
         [np.cos(theta_y), 0, np.sin(theta_y),0],
-        [0, 1, 0,0],
+        [0, 1, 0, 0],
         [-np.sin(theta_y), 0, np.cos(theta_y),0],
         [0, 0, 0, 1]
     ])
@@ -37,10 +37,10 @@ def R_x(theta_x):
 
 def C(x,y,z):
     C = np.array([
-        [1,0,0,-x],
-        [0,1,0,-y],
-        [0,0,1,-z],
-        [0,0,0,1]
+        [1, 0, 0, -x],
+        [0, 1, 0, -y],
+        [0, 0, 1, -z],
+        [0, 0, 0, 1]
     ])
     return C
 
@@ -142,9 +142,9 @@ def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thy
 
     for i in range(len(x_real)):
         print("point:")
-        print(x_real[i],z_real[i], y_real[i])
+        print(x_real[i], y_real[i], z_real[i])
 
-        XYZ=real_to_camera(point_x=x_real[i], point_y=z_real[i], point_z=y_real[i], camera_x=camera_x, camera_y=camera_z, camera_z=camera_y, theta_x=thpitch, theta_z=throll, theta_y=thyaw)
+        XYZ=real_to_camera(point_x=x_real[i], point_y=y_real[i], point_z=z_real[i], camera_x=camera_x, camera_y=camera_y, camera_z=camera_z, theta_x=thpitch, theta_y=throll, theta_z=thyaw)
         
 
         xy=camera_to_plane(XYZ,focal=focal,resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
@@ -162,3 +162,8 @@ def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thy
 
     return image
 
+
+
+def inversion_draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thpitch, throll, thyaw, focal, resolution_x, resolution_y, sensor_x, sensor_y):
+
+    return draw_points(image=image, x_real=x_real, y_real=z_real, z_real=y_real, camera_x=camera_x, camera_y=camera_z, camera_z=camera_y, thyaw=throll, thpitch=thpitch, throll=thyaw, focal=focal, resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
