@@ -21,7 +21,7 @@ def main():
     zt= 7  # Coordinate della camera
     thyaw = 0* np.pi / 180  # Z
     thpitch = (((360-32) * np.pi) / 180)  # X
-    throll = 10.5 * np.pi / 180  # Y
+    throll = 0 * np.pi / 180  # Y
     f = 0.003  # Distanza focale (m)
 
     # parametri per test2

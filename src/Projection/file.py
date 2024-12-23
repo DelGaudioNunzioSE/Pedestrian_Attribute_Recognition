@@ -33,7 +33,9 @@ def R_x(theta_x):
     ])
     return Rx
 
-
+def RotationMatrix(theta_x, theta_y, theta_z):
+    R = R_x(theta_x) @ R_z(theta_z) @ R_y(theta_y)
+    return R
 
 def C(x,y,z):
     C = np.array([
@@ -53,18 +55,22 @@ def UVW(x,y,z):
     ])
     return UVW
 
+def transformationMatrix(rotation_matrix, translation_matrix):
+    transformation_matrix = rotation_matrix @ translation_matrix
+    return transformation_matrix
+
 
 def real_to_camera(point_x, point_y, point_z, camera_x, camera_y, camera_z,  theta_x=0, theta_y=0, theta_z=0):
     translation_matrix = C(camera_x, camera_y, camera_z)
     
     # Poi, applica la rotazione (intorno agli assi Z, Y, e X)
-    rotation_matrix = R_z(theta_z) @ R_y(theta_y) @ R_x(theta_x)  # Assumiamo l'ordine di rotazione Z-Y-X
+    rotation_matrix = RotationMatrix(theta_x=theta_x, theta_y=theta_y, theta_z=theta_z)  # Assumiamo l'ordine di rotazione Z-Y-X
     
     # Ora combiniamo la trasformazione (rotazione + traslazione)
-    transformation_matrix = rotation_matrix @ translation_matrix
-    
+    transformation_matrix = transformationMatrix(rotation_matrix=rotation_matrix, translation_matrix=translation_matrix)
+
     # Applichiamo la trasformazione al punto in coordinate UVW
-    UVW_point = UVW(point_x, point_y, point_z)
+    UVW_point = UVW(x=point_x, y=point_y, z=point_z)
     XYZ = transformation_matrix @ UVW_point
 
     print("rotation:")
@@ -78,15 +84,15 @@ def real_to_camera(point_x, point_y, point_z, camera_x, camera_y, camera_z,  the
 
 
 
-def focal_length(focal,s_resolution,p_sensor):
-    s= p_sensor/s_resolution
-    return focal/s
+def focal_length(f,resolution,sensor):
+    s= sensor/resolution
+    return f/s
 
 
 def camera_to_plane(XYZ,focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
-    fx = focal_length(focal, resolution_x, sensor_x)  # Calcolo della focale in x
-    fy = focal_length(focal, resolution_y, sensor_y)  # Calcolo della focale in y
+    fx = focal_length(f=focal, resolution=resolution_x, sensor=sensor_x)  # Calcolo della focale in x
+    fy = focal_length(f=focal, resolution=resolution_y, sensor=sensor_y)  # Calcolo della focale in y
 
     ox = resolution_x / 2  # Centro dell'immagine in x
     oy = resolution_y / 2  # Centro dell'immagine in y
