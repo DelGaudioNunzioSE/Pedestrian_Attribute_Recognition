@@ -34,7 +34,7 @@ def R_x(theta_x):
     return Rx
 
 def RotationMatrix(theta_x, theta_y, theta_z):
-    R = R_x(theta_x) @ R_z(theta_z) @ R_y(theta_y)
+    R = R_z(theta_z) @ R_x(theta_x) @ R_y(theta_y) #zxy, yaw pitch and roll
     return R
 
 def C(x,y,z):
@@ -92,7 +92,7 @@ def focal_length(f,resolution,sensor):
 def camera_to_plane(XYZ,focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
     fx = focal_length(f=focal, resolution=resolution_x, sensor=sensor_x)  # Calcolo della focale in x
-    fy = focal_length(f=focal, resolution=resolution_y, sensor=sensor_y)  # Calcolo della focale in y
+    fy = -focal_length(f=focal, resolution=resolution_y, sensor=sensor_y)  # Calcolo della focale in y
 
     ox = resolution_x / 2  # Centro dell'immagine in x
     oy = resolution_y / 2  # Centro dell'immagine in y
