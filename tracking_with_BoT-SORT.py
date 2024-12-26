@@ -3,7 +3,6 @@ from ultralytics import YOLO  # Ensure you have the Ultralytics YOLO library ins
 import os
 import json
 
-
 # path_corrente = os.getcwd()
 # print(f"Il path corrente è: {path_corrente}")
 
@@ -27,12 +26,18 @@ def my_track(video_path, tracker, show=False):
     model = YOLO('yolov8m.pt')
     model.to(device)  # Move the model to the selected device
 
+    
+
     # Confirm the device of the model
     print(f"The model is loaded on: {next(model.parameters()).device}")
 
-    # Run tracking with the specified tracker configuration file
-    results = model.track(source=video_path, show=show, tracker=tracker, stream=True) #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
-       
+    #Run tracking with the specified tracker configuration file
+    results = model.track(source=video_path, show=show, tracker=tracker, stream=True, classes=0, imgsz = (540,920), vid_stride=3
+                          ,iou = 0.9) #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
+    #vede solo le persone classes=0
+    #vid_stride = 4, analizza un frame ogni 4   
+    #la risoluzione originale del video fa scattare il video, posso ridurla e mantenere l'aspect ratio
+
     for result in results:
        for id in result.boxes.id:
         new_person = {"id":id.item(),
@@ -58,4 +63,8 @@ with open(file_path, 'w', encoding='utf-8') as file:
     print(f"File salvato in {file_path}")
 
 
+
+
+# If you're detecting one frame per second in a 30 fps video, you'll want to set the track_buffer to a value that accommodates the 29 frames in between detections. In this case, setting track_buffer to 30 should work well
+# as it allows the tracker to maintain the track for approximately one second (30 frames) without an update.
 

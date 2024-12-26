@@ -2,11 +2,12 @@
 # Default YOLO tracker settings for BoT-SORT tracker https://github.com/NirAharon/BoT-SORT
 
 tracker_type: botsort # tracker type, ['botsort', 'bytetrack']
-track_high_thresh: 0.25 # threshold for the first association
-track_low_thresh: 0.1 # threshold for the second association
+track_high_thresh: 0.25 # threshold for the first association, prima di procedere col matching vede se la CONFIDENZA supera questa soglia, altrimenti la scarta direttamente
+track_low_thresh: 0.1 # threshold for the second association, se superando questa restano in Dlow
+#seguita da normale hungarian
 new_track_thresh: 0.25 # threshold for init new track if the detection does not match any tracks
 track_buffer: 30 # buffer to calculate the time when to remove tracks
-match_thresh: 0.8 # threshold for matching tracks
+match_thresh: 0.8 # threshold for matching tracks, soglia usata da Hungarian per track considerate per il matching
 fuse_score: True # Whether to fuse confidence scores with the iou distances before matching
 # min_box_area: 10  # threshold for min box areas(for tracker evaluation, not used for now)
 
@@ -16,3 +17,5 @@ gmc_method: sparseOptFlow # method of global motion compensation
 proximity_thresh: 0.5
 appearance_thresh: 0.25
 with_reid: False
+
+#quelle che non superano track_high_thresh e track_low_thresh vengono scartate perchè considerate sfondo
