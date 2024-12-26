@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from Projection.file import *
+from Projection.file import inversion_draw_points
 
 def main():
     print("Projection")
 
     # Lettura immagine con OpenCV
-    image_file = "src/Projection/test1.png"
+    image_file = "src/Projection/test2.png"
     img = cv2.imread(image_file)
 
 
@@ -18,7 +18,7 @@ def main():
     z_real = np.zeros_like(x_real)
     xt= 0
     yt= 0
-    zt= 7  # Coordinate della camera
+    zt= 7.2  # Coordinate della camera
     thyaw = 0* np.pi / 180  # Z
     thpitch = (((360-32) * np.pi) / 180)  # X
     throll = 0 * np.pi / 180  # Y
@@ -33,19 +33,18 @@ def main():
         yt= 0
         zt= 6.92  # Coordinate della camera
         thyaw = 12 * np.pi / 180  # Z
-        thpitch = (((360-36) * np.pi) / 180)  # X
+        thpitch = ((-36) * np.pi) / 180  # X
         throll = 10.5 * np.pi / 180  # Y
         f = 0.00325  # Distanza focale (m)
 
     # Parametri fissi
     s_w = 0.00498  # Larghezza sensore (m)
-    s_h = 0.00374  # Altezza sensore (m)
+    s_h = 0.003# 74  # Altezza sensore (m)
     U = img.shape[1]   # Larghezza immagine (pixel)
     V = img.shape[0]  # Altezza immagine (pixel)
 
 
-    img_with_points=inversion_draw_points(image=img, x_real=x_real, y_real=y_real, z_real=z_real, camera_x=xt, camera_y=yt, camera_z=zt, thyaw=thyaw, thpitch=thpitch, throll=throll, focal=f, resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
-
+    img_with_points=inversion_draw_points2(image=img, x_real=x_real, y_real=y_real, z_real=z_real, camera_x=xt, camera_y=yt, camera_z=zt, thyaw=thyaw, thpitch=thpitch, throll=throll, focal=f, resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
 
     # Salva e visualizza il risultato
     output_file = "./Projection/output_image.png"
