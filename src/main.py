@@ -33,7 +33,7 @@ def main():
         yt= 0
         zt= 6.92  # Coordinate della camera
         thyaw = 12 * np.pi / 180  # Z
-        thpitch = (((360-36) * np.pi) / 180)  # X
+        thpitch = ((-36) * np.pi) / 180  # X
         throll = 10.5 * np.pi / 180  # Y
         f = 0.00325  # Distanza focale (m)
 
@@ -45,7 +45,6 @@ def main():
 
 
     img_with_points=inversion_draw_points(image=img, x_real=x_real, y_real=y_real, z_real=z_real, camera_x=xt, camera_y=yt, camera_z=zt, thyaw=thyaw, thpitch=thpitch, throll=throll, focal=f, resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
-
 
     # Salva e visualizza il risultato
     output_file = "src/Projection/imgs/output_image.png"
