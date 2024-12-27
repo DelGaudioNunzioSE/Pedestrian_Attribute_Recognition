@@ -6,9 +6,11 @@ import torchvision.transforms as transforms
 
 class CSVDataset(Dataset):
     def __init__(self, csv_file, train, transform=None):
-        self.data = pd.read_csv(csv_file,nrows=200,sep=';') #TOGLIERE!!
+
+        self.data = csv_file #TOGLIERE nrows!!
         self.transform = transform #se vuoi fare augmentation
         self.train = train
+
 
     def __len__(self):
         return len(self.data)

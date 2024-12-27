@@ -79,9 +79,4 @@ class CNNWithAttention(nn.Module):
         out3 = self.classifier3(x3)  # [B, num_classes]
 
 
-        # # Sigmoid sull'output finale
-        # out1 = self.sigmoid(out1)
-        # out2 = self.sigmoid(out2)
-        # out3 = self.sigmoid(out3)
-
         return out1, out2, out3
