@@ -12,8 +12,9 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 
 def adjustedLoss(prediction, labels):
-        criterion = nn.BCEWithLogitsLoss(reduction='none') #restituisce la loss per ogni sample
-        loss = criterion(prediction, labels[:, 0].unsqueeze(1))
+        criterion = nn.BCEWithLogitsLoss(reduction='none') #object to evaluate sigmoid and then LOSS
+
+        loss = criterion(prediction, labels[:, 0].unsqueeze(1)) # evaluate loss
         mask = labels != -1 #prendo tutti gli indici delle labels -1
         valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
         mean_loss = valid_losses.mean() #ci faccio la media

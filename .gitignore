@@ -1,2 +1,3 @@
 __pycache__/
-Datasets/
+src/Classifier/Datasets/validation_set/
+src/Classifier/Datasets/training_set/
