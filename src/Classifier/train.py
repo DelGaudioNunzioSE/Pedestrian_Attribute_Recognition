@@ -39,7 +39,7 @@ transform = transforms.Compose([transforms.ToTensor(),
 							   ]) #per ora solo questa
 
 #lettura dataset
-data = pd.read_csv('./src/Classifier/Datasets/training_set.csv',nrows=800,sep=';') #TOGLIERE nrows!!
+data = pd.read_csv('./src/Classifier/Datasets/training_set.csv',sep=';',nrows=10000) #TOGLIERE nrows!!
 train_data, val_data = train_test_split(data, test_size=0.2, random_state=42)
 
 
@@ -50,11 +50,11 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=transform, train=True) #
 #dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False) #potrei applicare trasformazioni per fare data augmentation
 
 
-batch_sampler = CustomBatchSampler(dataset_train, batch_size=32)
+batch_sampler = CustomBatchSampler(dataset_train, batch_size=64)
 data_train = DataLoader(dataset_train, batch_sampler=batch_sampler) #batch di train
 #data_test = DataLoader(dataset_test, batch_sampler=batch_sampler)
 
-batch_sampler_valid = CustomBatchSampler(dataset_valid, batch_size=32)
+batch_sampler_valid = CustomBatchSampler(dataset_valid, batch_size=64)
 data_valid = DataLoader(dataset_valid, batch_sampler=batch_sampler_valid)
 
 
@@ -63,7 +63,6 @@ data_valid = DataLoader(dataset_valid, batch_sampler=batch_sampler_valid)
 criterion = nn.BCEWithLogitsLoss() #ottengo la loss per ogni campione
 
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-
 
 losses_hat = [] 
 losses_gender = [] 
@@ -86,7 +85,7 @@ val_accuracies_hat = []
 val_accuracies_tot = [] 
 
 # Train the model
-num_epochs=100
+num_epochs=50
 for epoch in range(num_epochs):  # Ciclo su tutte le epoche
     loss_train = 0
     model.train()
@@ -115,7 +114,7 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         loss_train += loss.item()
 
        
-    if (epoch + 1) % 10 == 0:
+    if (epoch + 1) % 2 == 0:
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
@@ -168,7 +167,9 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         print(f"Train Loss: {losses_tot[-1]:.4f}, Validation Loss: {val_loss:.4f}")
         print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}")
         print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
+        print("Epoch: ",epoch)
 
+# Plot Validation Loss
 plt.figure(figsize=(8, 6))
 plt.plot(range(1, len(val_losses_tot) + 1), val_losses_tot, label='Validation Loss', marker='o')
 plt.xlabel('Epochs')
@@ -207,6 +208,26 @@ plt.title('Validation Accuracy (Bag)')
 plt.grid(True)
 plt.legend()
 plt.show()
+
+plt.figure(figsize=(8, 6))
+plt.plot(losses_tot, label='Train Loss', color='blue', marker='o')
+plt.plot(val_losses_tot, label='Validation Loss', color='red', marker='x')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title('Training Loss vs Validation Loss')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+checkpoint = {
+    'model_state_dict': model.state_dict(),
+    'optimizer_state_dict': optimizer.state_dict(),
+    'epoch': epoch,  # opzionale, per salvare l'epoca corrente
+    'losses': losses_tot,  # opzionale, per salvare la lista delle perdite
+}
+
+torch.save(checkpoint, './src/Classifier/Models/checkpoint.pth')
+print("Model and optimizer saved successfully!")
 
 
        
