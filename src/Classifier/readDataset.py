@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 
 class CSVDataset(Dataset):
     def __init__(self, csv_file, train, transform=None):
-        self.data = pd.read_csv(csv_file,nrows=1000,sep=';') #TOGLIERE!!
+        self.data = pd.read_csv(csv_file,nrows=200,sep=';') #TOGLIERE!!
         self.transform = transform #se vuoi fare augmentation
         self.train = train
 
@@ -24,4 +24,4 @@ class CSVDataset(Dataset):
         if self.transform:
             image = self.transform(image)
         
-        return image, torch.tensor(labels, dtype=torch.long)
+        return image, torch.tensor(labels, dtype=torch.float)

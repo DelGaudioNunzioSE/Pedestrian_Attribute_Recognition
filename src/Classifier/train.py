@@ -1,5 +1,4 @@
 import torch 
-import torchvision 
 import torch.nn as nn 
 import torch.optim as optim 
 import torch.nn.functional as F
@@ -8,14 +7,13 @@ import pandas as pd
 from shuffleBatch import CustomBatchSampler
 from torch.utils.data import DataLoader
 from readDataset import CSVDataset
-from sklearn.model_selection import train_test_split
 from torchvision import transforms
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 transform = transforms.Compose([transforms.ToTensor(),
 							   transforms.Resize((224, 224))
 							   ]) #per ora solo questa
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu") 
 
 #lettura dataset
 model = CNNWithAttention()   
@@ -35,14 +33,17 @@ data_train = DataLoader(dataset, batch_sampler=batch_sampler)
 # Move the model to the GPU if available 
 model.to(device)
 
-criterion_gender = nn.CrossEntropyLoss() 
-criterion_hat = nn.CrossEntropyLoss() 
-criterion_bag = nn.CrossEntropyLoss()
+# criterion_gender = nn.CrossEntropyLoss() 
+# criterion_hat = nn.CrossEntropyLoss() 
+# criterion_bag = nn.CrossEntropyLoss()
+
+# Usa il sigmoide all'interno, quindi non c'è bisogno di usarlo nella rete neurale
+# E' più stabile di sigmoide seguito da BCE.
+criterion_gender = nn.BCEWithLogitsLoss()
+criterion_hat = nn.BCEWithLogitsLoss()
+criterion_bag = nn.BCEWithLogitsLoss()
 
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-num_epochs=10
-
 
 
 losses_hat = [] 
@@ -64,20 +65,21 @@ val_accuracies_bag = []
 val_accuracies_hat = [] 
 val_accuracies_tot = [] 
 
-# Train the model 
+# Train the model
+num_epochs=2 
 for epoch in range(num_epochs):  # Ciclo su tutte le epoche
     for i, (images, labels) in enumerate(data_train):  # Ciclo sui batch di training
         # Forward pass
         images = images.to(device)
         labels = labels.to(device)
-        output1,output2,output3 = model(images)  # 3 valori
+        gender, hat, bag = model(images)  # 3 valori
 
         labels[labels == -1] = 0 #TOGLIERE
+        print(gender.size())
 
-
-        loss_gender = criterion_gender(output1, labels[:,0].unsqueeze(1)) 
-        loss_hat = criterion_hat(output2, labels[:,1].unsqueeze(1))
-        loss_bag = criterion_bag(output3, labels[:,2].unsqueeze(1)) #unsqueeze ha fatto 32x1
+        loss_gender = criterion_gender(gender, labels[:,0].unsqueeze(1)) 
+        loss_hat = criterion_hat(hat, labels[:,1].unsqueeze(1))
+        loss_bag = criterion_bag(bag, labels[:,2].unsqueeze(1)) #unsqueeze ha fatto 32x1
         loss = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag  # i pesi devono essere dinamici
 
         # Backward pass and optimization
@@ -85,16 +87,14 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         loss.backward()
         optimizer.step()
 
-        # Calcola l'accuratezza
-        # acc_gender = (output1 == labels[:,0]).sum().item() / labels.size(0)
-        # acc_hat = (predicted == labels).sum().item() / labels.size(0)
-        # acc_bag = (predicted == labels).sum().item() / labels.size(0)
+        # Applico un threshold per dire che quando la prob è superiore a 0.5 è classe 1.
+        # Devo applicare anche il sigmoide perchè la loss lo applica internamente.
+        gender_pred = torch.sigmoid(gender) > 0.5
+        accuracy = (gender_pred == labels[:,0].unsqueeze(1)).float().mean()
 
-        # accuracies.append(acc_gender)
-        # accuracies.append(acc_hat)
-        # accuracies.append(acc_bag)
-        # losses.append(loss.item())
 
+        losses_tot.append(loss.item())
+    print(epoch)
         # # Valutazione del modello sul set di validazione
         # val_loss = 0.0
         # val_acc = 0.0
@@ -112,4 +112,4 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         #         val_acc += correct / total
         #         val_accuracies.append(val_acc)
         
-
+print(losses_tot)
