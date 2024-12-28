@@ -16,14 +16,20 @@ class CSVDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path = self.data.iloc[idx, 0]  # Percorso immagine
+
+        img_path = self.data.iloc[idx, 0]  # Image path
         labels = self.data.iloc[idx, 1:4] # label0, label1, label2
+
+        # Load image
         if self.train == True:
             img_path = "./src/Classifier/Datasets/training_set/" + img_path
         else:
             img_path = "./src/Classifier/Datasets/validation_set/" + img_path
         image = Image.open(img_path).convert('RGB')
+
+        # Apply transformations
         if self.transform:
             image = self.transform(image)
         
+        # Return image and labels
         return image, torch.tensor(labels, dtype=torch.float)

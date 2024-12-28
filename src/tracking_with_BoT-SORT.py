@@ -1,3 +1,4 @@
+import cv2
 import torch
 from ultralytics import YOLO  # Ensure you have the Ultralytics YOLO library installed
 import os
@@ -24,16 +25,16 @@ transform = transforms.Compose([transforms.ToTensor(),
 
 
 
-def drawBox(box, frame):
+def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
+    cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
 
 
 def my_track(video_path, tracker, show=False):
-    # Dynamically determine the best device
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -59,20 +60,43 @@ def my_track(video_path, tracker, show=False):
        
     for result in results:
         frame = result.orig_img  # Immagine originale del frame
+    
+        # Itera su ogni bounding box e ID
         for box, id in zip(result.boxes.xyxy, result.boxes.id):
-            img = drawBox(box,frame) #preparo l'input alla rete per le predizioni
-            img = img.unsqueeze(0)
-            img = img.to(device)
+            x1, y1, x2, y2 = map(int, box)  # Bounding box coordinates
+            img = drawBox(box, frame,device)  # Prepara input per la rete di classificazione
+            
+            # Classificazioni (gender, hat, bag)
             gender, hat, bag = classifier_model(img)
             gender_pred = torch.sigmoid(gender) > 0.5
             hat_pred = torch.sigmoid(hat) > 0.5
             bag_pred = torch.sigmoid(bag) > 0.5
-            new_person = {"id":id.item(),
-                            "gender":gender_pred,
-                            "hat":hat_pred,
-                            "bag":bag_pred,
-                            "trajectory":"???"}
-            data["people"].append(new_person) #le metto tutte durante il video poi alla fine vedo quali tenere
+            
+            # Crea un dizionario con le informazioni
+            new_person = {
+                "id": id.item(),
+                "gender": "Male" if gender_pred else "Female",
+                "hat": "Yes" if hat_pred else "No",
+                "bag": "Yes" if bag_pred else "No",
+                "trajectory": "???"
+            }
+            data["people"].append(new_person)
+            
+            # Disegna il bounding box sul frame
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Testo con le informazioni
+            text = f"ID: {new_person['id']} | G: {new_person['gender']} | Hat: {new_person['hat']} | Bag: {new_person['bag']}"
+            
+            # Posiziona il testo sopra il bounding box
+            cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # Mostra il frame con i risultati
+        cv2.imshow("Tracking", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
 
 
 

@@ -10,65 +10,33 @@ from readDataset import CSVDataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
+from reorderCSV import reorderCSV
 
-def adjustedLoss(prediction, labels):
-        criterion = nn.BCEWithLogitsLoss(reduction='none') #object to evaluate sigmoid and then LOSS
-
-        loss = criterion(prediction, labels[:, 0].unsqueeze(1)) # evaluate loss
-        mask = labels != -1 #prendo tutti gli indici delle labels -1
-        valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
-        mean_loss = valid_losses.mean() #ci faccio la media
-        loss[~mask] = mean_loss #la sostituisco al posto delle labels -1
-        batch_loss = loss.mean() #ritorno la media con le nuove loss
-
-        return batch_loss
+DEBAUG=False
 
 
-if torch.cuda.is_available():
-        device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-else:
-        device = torch.device("cpu")
-
-print(f"Using device: {device}") 
+# Paths
+CSV_TRAINIG_FILE='./src/Classifier/Datasets/training_set.csv'
+CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
 
 
-transform = transforms.Compose([transforms.ToTensor(),
-				transforms.Resize((224, 224))
-							   ]) #per ora solo questa
-
-#lettura dataset
-data = pd.read_csv('./src/Classifier/Datasets/training_set.csv',sep=';',nrows=10000) #TOGLIERE nrows!!
-train_data, val_data = train_test_split(data, test_size=0.2, random_state=42)
-
-
-model = CNNWithAttention()   
-model.to(device)
-dataset_train = CSVDataset(csv_file=train_data, transform=transform, train=True) #potrei applicare trasformazioni per fare data augmentation
-dataset_valid = CSVDataset(csv_file=val_data, transform=transform, train=True) #potrei applicare trasformazioni per fare data augmentation
-#dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False) #potrei applicare trasformazioni per fare data augmentation
+# Learning parameters
+BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
+TEST_SIZE = 0.3
+LEARNING_RATE = 0.001
+NUM_EPOCHS = 5
+POS_WEIGHT_GENDER = 61000/24000 # 24000 1 61000 0
+POS_WEIGHT_HAT  = 55000/10500 # 10500 1 55000 0
+POS_WEIGHT_BAG  = 69000/9600 # 9600 1 # 69000 0
+############################################
 
 
-batch_sampler = CustomBatchSampler(dataset_train, batch_size=64)
-data_train = DataLoader(dataset_train, batch_sampler=batch_sampler) #batch di train
-#data_test = DataLoader(dataset_test, batch_sampler=batch_sampler)
-
-batch_sampler_valid = CustomBatchSampler(dataset_valid, batch_size=64)
-data_valid = DataLoader(dataset_valid, batch_sampler=batch_sampler_valid)
-
-
-# Usa il sigmoide all'interno, quindi non c'è bisogno di usarlo nella rete neurale
-# E' più stabile di sigmoide seguito da BCE.
-criterion = nn.BCEWithLogitsLoss() #ottengo la loss per ogni campione
-
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
+# Lists to store losses and accuracies
 losses_hat = [] 
 losses_gender = [] 
 losses_bag = [] 
 losses_tot = [] 
-loss_train = 0
+total_training_loss = 0
 
 accuracies_hat = []
 accuracies_gender = [] 
@@ -83,22 +51,134 @@ val_accuracies_gender = []
 val_accuracies_bag = [] 
 val_accuracies_hat = [] 
 val_accuracies_tot = [] 
+############################################
 
-# Train the model
-num_epochs=50
-for epoch in range(num_epochs):  # Ciclo su tutte le epoche
-    loss_train = 0
-    model.train()
+# Checkpoint function
+def checkpoint_fuction():
+    checkpoint = {
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'epoch': epoch,  # save the current epoch
+        'losses': losses_tot,  # save the list of losses
+    }
+    checkpoint_filename = f'./src/Classifier/Models/checkpoint_epoch_{epoch}.pth'
+    torch.save(checkpoint, checkpoint_filename)
+    print("Model and optimizer saved successfully!")
+
+       
+# Loss Function
+def adjustedLoss(prediction, labels, pos_weight ):
+        pos_weight = torch.tensor([pos_weight]) # weight for positive examples
+        pos_weight=pos_weight.to(device)
+
+        criterion = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight) # object to evaluate sigmoid and then LOSS
+
+        loss = criterion(prediction, labels[:, 0].unsqueeze(1)) # evaluate loss
+
+        mask = labels != -1 #prendo tutti gli indici delle labels -1
+        valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
+        mean_loss = valid_losses.mean() #ci faccio la media
+        loss[~mask] = mean_loss #la sostituisco al posto delle labels -1
+
+
+
+        batch_loss = loss.mean() #ritorno la media con le nuove loss
+
+        return batch_loss
+
+
+
+
+
+
+###########################################################
+# START TRAINING
+
+
+
+
+
+
+# torch setup
+if torch.cuda.is_available():
+        device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+else:
+        device = torch.device("cpu")
+
+print(f"Using device: {device}") 
+
+
+
+# Data Augmentation
+# Compose = Composition of transformations
+TRANSFORMS = transforms.Compose([transforms.ToTensor(), # -> [C (number of channels), H (height), W (width)] 
+				transforms.Resize((224, 224)) # (TODO not necessary)
+							   ])
+
+
+# Changing the dataset
+rcsv=reorderCSV(batch_size=BATCH_SIZE ,csv_file=CSV_TRAINIG_FILE, new_csv_file=CSV_NEW_TRAINING_FILE)
+rcsv.print_new_csv()
+
+
+# Reading new dataset
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';')
+train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
+
+# Model creation
+model = CNNWithAttention()   
+model.to(device)
+
+# Object to load images
+# (csv_file -> in the first column there are the paths of the images)
+dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True)
+dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True)
+# TODO dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False)
+
+# DataLoader
+# Test DataLoader
+# TODO TOERASE batch_sampler = CustomBatchSampler(dataset_train, batch_size=BATCH_SIZE)
+data_train = DataLoader(dataset_train, batch_size=BATCH_SIZE) #batch di train
+# TODO data_test = DataLoader(dataset_test, batch_sampler=batch_sampler)
+
+# Validation DataLoader
+#batch_sampler_valid = CustomBatchSampler(dataset_valid, batch_size=BATCH_SIZE)
+data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
+
+
+# Usa il sigmoide all'interno, quindi non c'è bisogno di usarlo nella rete neurale
+# E' più stabile di sigmoide seguito da BCE.
+# criterion = nn.BCEWithLogitsLoss() #ottengo la loss per ogni campione
+
+
+# Optimizer
+optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+
+
+
+###########################################################
+# TRAINING LOOP  ##########################################
+
+print('Datatrain dimension:', len(data_train*BATCH_SIZE)) # len(data_train) = batch number
+
+for epoch in range(NUM_EPOCHS):
+    
+    print("We are in Epoch number: ", epoch)
+    total_training_loss = 0 # Loss reset for evry epoch
+    model.train() # Training mode ENABLED
+
+    # Loop over the training batches
     for i, (images, labels) in enumerate(data_train):  # Ciclo sui batch di training
         # Forward pass
-        images = images.to(device)
-        labels = labels.to(device)
-        gender, hat, bag = model(images)  # 3 valori
+        images, labels = images.to(device), labels.to(device)
+        gender, hat, bag = model(images)  # FORWARD PASS
 
 
-        loss_gender = adjustedLoss(gender, labels[:,0].unsqueeze(1))
-        loss_hat = adjustedLoss(hat, labels[:,1].unsqueeze(1))
-        loss_bag = adjustedLoss(bag, labels[:,2].unsqueeze(1)) #unsqueeze ha fatto 32x1
+        loss_gender = adjustedLoss(gender, labels[:,0].unsqueeze(1),pos_weight= POS_WEIGHT_GENDER)
+        loss_hat = adjustedLoss(hat, labels[:,1].unsqueeze(1),pos_weight=POS_WEIGHT_HAT)
+        loss_bag = adjustedLoss(bag, labels[:,2].unsqueeze(1),pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
         loss = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag  # i pesi devono essere dinamici
 
         # Backward pass and optimization
@@ -106,14 +186,16 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         loss.backward()
         optimizer.step()
 
-        # Applico un threshold per dire che quando la prob è superiore a 0.5 è classe 1.
-        # Devo applicare anche il sigmoide perchè la loss lo applica internamente.
-        gender_pred = torch.sigmoid(gender) > 0.5
-        accuracy = (gender_pred == labels[:,0].unsqueeze(1)).float().mean()
+        total_training_loss += loss.item()
 
-        loss_train += loss.item()
+        if(DEBAUG==True):
+                print('sono alla ', i)
+                print('la loss gender è:', loss_gender.item(), 'labels:', labels[:,0])
+                print( ' la loss hat è:', loss_hat.item(), 'labels:',    labels[:,1])
+                print('la loss bag è:', loss_bag.item(), 'labels:',  labels[:,2])	
+        print('Loss for', i, '\° branch over', len(data_train), 'is:', loss.item())
 
-       
+    # Validation
     if (epoch + 1) % 2 == 0:
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
@@ -130,9 +212,9 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
                         gender, hat, bag = model(images)
 
                         # Calcola le perdite
-                        loss_gender = adjustedLoss(gender, labels[:, 0].unsqueeze(1))
-                        loss_hat = adjustedLoss(hat, labels[:, 1].unsqueeze(1))
-                        loss_bag = adjustedLoss(bag, labels[:, 2].unsqueeze(1))
+                        loss_gender = adjustedLoss(gender, labels[:, 0].unsqueeze(1),pos_weight= POS_WEIGHT_GENDER)
+                        loss_hat = adjustedLoss(hat, labels[:, 1].unsqueeze(1),pos_weight= POS_WEIGHT_HAT)
+                        loss_bag = adjustedLoss(bag, labels[:, 2].unsqueeze(1),pos_weight= POS_WEIGHT_BAG)
                         loss_val = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag
 
                         val_loss += loss_val.item()
@@ -159,7 +241,7 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         val_acc_bag /= total_samples
 
         # Salvo i valori di validazione per ogni epoca
-        losses_tot.append(loss_train / len(data_train))
+        losses_tot.append(total_training_loss / len(data_train))
         val_losses_tot.append(val_loss)
         val_accuracies_gender.append(val_acc_gender)
         val_accuracies_hat.append(val_acc_hat)
@@ -169,6 +251,10 @@ for epoch in range(num_epochs):  # Ciclo su tutte le epoche
         print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
         print("Epoch: ",epoch)
 
+
+
+
+######################################################
 # Plot Validation Loss
 plt.figure(figsize=(8, 6))
 plt.plot(range(1, len(val_losses_tot) + 1), val_losses_tot, label='Validation Loss', marker='o')
