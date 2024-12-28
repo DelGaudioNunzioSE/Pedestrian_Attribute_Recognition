@@ -8,6 +8,7 @@ from Classifier.firstClassifier import CNNWithAttention
 from PIL import Image
 
 
+CHECKPOINT_NAME = 'checkpoint_epoch_4_2812_153647.pth'
 
 
 
