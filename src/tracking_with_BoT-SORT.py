@@ -8,6 +8,7 @@ from Classifier.firstClassifier import CNNWithAttention
 from PIL import Image
 
 
+CHECKPOINT_NAME = 'checkpoint_epoch_4_2812_153647.pth'
 
 
 
@@ -47,7 +48,12 @@ def my_track(video_path, tracker, show=False):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention()   
+    classifier_model = CNNWithAttention()  
+
+    # Load the trained model weights
+    checkpoint = torch.load('./src/Classifier/Models/'+ CHECKPOINT_NAME)
+    classifier_model.load_state_dict(checkpoint['model_state_dict'])
+
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
 

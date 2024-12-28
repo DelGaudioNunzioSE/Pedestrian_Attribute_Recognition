@@ -4,30 +4,46 @@ import torch.optim as optim
 import torch.nn.functional as F
 from firstClassifier import CNNWithAttention
 import pandas as pd
-from shuffleBatch import CustomBatchSampler
 from torch.utils.data import DataLoader
 from readDataset import CSVDataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from reorderCSV import reorderCSV
+from datetime import datetime
 
+
+#
+# Setup
 DEBAUG=False
+# torch setup
+if torch.cuda.is_available():
+        DEVICE = torch.device("cuda")
+elif torch.backends.mps.is_available():
+        DEVICE = torch.device("mps")
+else:
+        DEVICE = torch.device("cpu")
 
+print(f"Using device: {DEVICE}") 
+
+############################################
 
 # Paths
 CSV_TRAINIG_FILE='./src/Classifier/Datasets/training_set.csv'
-CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
+CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 
 
 # Learning parameters
 BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
+DATASET_SIZE = 92160//3  #Total number of samples: 92160
 TEST_SIZE = 0.3
 LEARNING_RATE = 0.001
 NUM_EPOCHS = 5
-POS_WEIGHT_GENDER = 61000/24000 # 24000 1 61000 0
-POS_WEIGHT_HAT  = 55000/10500 # 10500 1 55000 0
-POS_WEIGHT_BAG  = 69000/9600 # 9600 1 # 69000 0
+EPOTH_SAVE = 0 # from which epoch start to save the model
+IMAGE_RESOLUTION = (120, 300) 
+POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
+POS_WEIGHT_HAT  = torch.tensor([55000/10500], device=DEVICE) # 10500 1 55000 0
+POS_WEIGHT_BAG  = torch.tensor([69000/9600], device=DEVICE) # 9600 1 # 69000 0
 ############################################
 
 
@@ -55,25 +71,25 @@ val_accuracies_tot = []
 
 # Checkpoint function
 def checkpoint_fuction():
+    timestamp = datetime.now().strftime('%d-%H:%M')  # Formato: DDMM_HHMMSS
+
     checkpoint = {
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
         'epoch': epoch,  # save the current epoch
         'losses': losses_tot,  # save the list of losses
     }
-    checkpoint_filename = f'./src/Classifier/Models/checkpoint_epoch_{epoch}.pth'
+    checkpoint_filename = f'./src/Classifier/Models/checkpoint_epoch_{epoch}_{timestamp}.pth'
     torch.save(checkpoint, checkpoint_filename)
     print("Model and optimizer saved successfully!")
 
        
 # Loss Function
 def adjustedLoss(prediction, labels, pos_weight ):
-        pos_weight = torch.tensor([pos_weight]) # weight for positive examples
-        pos_weight=pos_weight.to(device)
 
         criterion = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight) # object to evaluate sigmoid and then LOSS
 
-        loss = criterion(prediction, labels[:, 0].unsqueeze(1)) # evaluate loss
+        loss = criterion(prediction, labels.unsqueeze(1)) # evaluate loss
 
         mask = labels != -1 #prendo tutti gli indici delle labels -1
         valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
@@ -99,22 +115,10 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
 
 
-# torch setup
-if torch.cuda.is_available():
-        device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-else:
-        device = torch.device("cpu")
-
-print(f"Using device: {device}") 
-
-
-
 # Data Augmentation
 # Compose = Composition of transformations
 TRANSFORMS = transforms.Compose([transforms.ToTensor(), # -> [C (number of channels), H (height), W (width)] 
-				transforms.Resize((224, 224)) # (TODO not necessary)
+				transforms.Resize(IMAGE_RESOLUTION) 
 							   ])
 
 
@@ -124,12 +128,12 @@ rcsv.print_new_csv()
 
 
 # Reading new dataset
-data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';')
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';', nrows=DATASET_SIZE)
 train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
 
 # Model creation
 model = CNNWithAttention()   
-model.to(device)
+model.to(DEVICE)
 
 # Object to load images
 # (csv_file -> in the first column there are the paths of the images)
@@ -161,7 +165,7 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 ###########################################################
 # TRAINING LOOP  ##########################################
 
-print('Datatrain dimension:', len(data_train*BATCH_SIZE)) # len(data_train) = batch number
+print('Datatrain dimension:', len(data_train)*BATCH_SIZE) # len(data_train) = batch number
 
 for epoch in range(NUM_EPOCHS):
     
@@ -172,13 +176,13 @@ for epoch in range(NUM_EPOCHS):
     # Loop over the training batches
     for i, (images, labels) in enumerate(data_train):  # Ciclo sui batch di training
         # Forward pass
-        images, labels = images.to(device), labels.to(device)
+        images, labels = images.to(DEVICE), labels.to(DEVICE)
         gender, hat, bag = model(images)  # FORWARD PASS
 
 
-        loss_gender = adjustedLoss(gender, labels[:,0].unsqueeze(1),pos_weight= POS_WEIGHT_GENDER)
-        loss_hat = adjustedLoss(hat, labels[:,1].unsqueeze(1),pos_weight=POS_WEIGHT_HAT)
-        loss_bag = adjustedLoss(bag, labels[:,2].unsqueeze(1),pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
+        loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
+        loss_hat = adjustedLoss(hat, labels[:,1],pos_weight=POS_WEIGHT_HAT)
+        loss_bag = adjustedLoss(bag, labels[:,2],pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
         loss = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag  # i pesi devono essere dinamici
 
         # Backward pass and optimization
@@ -193,10 +197,17 @@ for epoch in range(NUM_EPOCHS):
                 print('la loss gender è:', loss_gender.item(), 'labels:', labels[:,0])
                 print( ' la loss hat è:', loss_hat.item(), 'labels:',    labels[:,1])
                 print('la loss bag è:', loss_bag.item(), 'labels:',  labels[:,2])	
-        print('Loss for', i, '\° branch over', len(data_train), 'is:', loss.item())
+        print(f'Loss for {i}° branch over', len(data_train), 'is:', loss.item())
+
+
+    # Save the model and the optimizer
+    if (epoch > (EPOTH_SAVE-1)):
+        print('Saving model and optimizer...')
+        checkpoint_fuction()
+
 
     # Validation
-    if (epoch + 1) % 2 == 0:
+    if (epoch % 1) == 0:
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
@@ -207,14 +218,14 @@ for epoch in range(NUM_EPOCHS):
 
         with torch.no_grad():  # Disabilita il calcolo dei gradienti per la validazione
                 for images, labels in data_valid:  # Ciclo sui batch di validazione
-                        images = images.to(device)
-                        labels = labels.to(device)
+                        images = images.to(DEVICE)
+                        labels = labels.to(DEVICE)
                         gender, hat, bag = model(images)
 
                         # Calcola le perdite
-                        loss_gender = adjustedLoss(gender, labels[:, 0].unsqueeze(1),pos_weight= POS_WEIGHT_GENDER)
-                        loss_hat = adjustedLoss(hat, labels[:, 1].unsqueeze(1),pos_weight= POS_WEIGHT_HAT)
-                        loss_bag = adjustedLoss(bag, labels[:, 2].unsqueeze(1),pos_weight= POS_WEIGHT_BAG)
+                        loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= POS_WEIGHT_GENDER)
+                        loss_hat = adjustedLoss(hat, labels[:, 1], pos_weight= POS_WEIGHT_HAT)
+                        loss_bag = adjustedLoss(bag, labels[:, 2], pos_weight= POS_WEIGHT_BAG)
                         loss_val = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag
 
                         val_loss += loss_val.item()
