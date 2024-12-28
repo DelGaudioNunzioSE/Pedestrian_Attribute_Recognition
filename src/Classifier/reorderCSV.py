@@ -10,7 +10,7 @@ class reorderCSV():
         self.dataset = self.dataset_csv.to_numpy()
         np.random.shuffle(self.dataset) # shuffle on rows
         self.batch_size = batch_size
-        self.new_dataset = np.empty((0, 4))  # inizialaize the branch
+        self.new_dataset = np.empty((0, 4))  # inizialize the branch
 
         self.new_csv_file = new_csv_file
     
@@ -32,7 +32,7 @@ class reorderCSV():
             temp_batch = self.dataset[:self.batch_size, :]
             
             # all ok
-            if((temp_batch != -1).any(axis=0).all()): # no only -1 in the collum (for evry collum)
+            if((temp_batch != -1).any(axis=0).all()): # no only -1 in the collum (for every column)
                 # append the batch
                 self.dataset = self.dataset[self.batch_size:, :] # erase the first batch
                 self.new_dataset= np.vstack([self.new_dataset, temp_batch]) # <-

@@ -47,7 +47,9 @@ def my_track(video_path, tracker, show=False):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention()   
+    classifier_model = CNNWithAttention()
+    checkpoint = torch.load('./src/Classifier/Models/checkpoint.pth')
+    classifier_model.load_state_dict(checkpoint['model_state_dict'])   
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
 
@@ -75,7 +77,7 @@ def my_track(video_path, tracker, show=False):
             # Crea un dizionario con le informazioni
             new_person = {
                 "id": id.item(),
-                "gender": "Male" if gender_pred else "Female",
+                "gender": "Female" if gender_pred else "Male",
                 "hat": "Yes" if hat_pred else "No",
                 "bag": "Yes" if bag_pred else "No",
                 "trajectory": "???"

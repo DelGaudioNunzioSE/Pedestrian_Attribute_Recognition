@@ -4,7 +4,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from firstClassifier import CNNWithAttention
 import pandas as pd
-from shuffleBatch import CustomBatchSampler
 from torch.utils.data import DataLoader
 from readDataset import CSVDataset
 from torchvision import transforms
@@ -12,19 +11,19 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from reorderCSV import reorderCSV
 
-DEBAUG=False
+DEBUG=False
 
 
 # Paths
 CSV_TRAINIG_FILE='./src/Classifier/Datasets/training_set.csv'
-CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
+CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 
 
 # Learning parameters
-BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
+BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
 TEST_SIZE = 0.3
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 5
+LEARNING_RATE = 0.0001
+NUM_EPOCHS = 10
 POS_WEIGHT_GENDER = 61000/24000 # 24000 1 61000 0
 POS_WEIGHT_HAT  = 55000/10500 # 10500 1 55000 0
 POS_WEIGHT_BAG  = 69000/9600 # 9600 1 # 69000 0
@@ -73,14 +72,12 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
         criterion = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight) # object to evaluate sigmoid and then LOSS
 
-        loss = criterion(prediction, labels[:, 0].unsqueeze(1)) # evaluate loss
+        loss = criterion(prediction, labels) # evaluate loss
 
         mask = labels != -1 #prendo tutti gli indici delle labels -1
         valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
         mean_loss = valid_losses.mean() #ci faccio la media
         loss[~mask] = mean_loss #la sostituisco al posto delle labels -1
-
-
 
         batch_loss = loss.mean() #ritorno la media con le nuove loss
 
@@ -124,7 +121,7 @@ rcsv.print_new_csv()
 
 
 # Reading new dataset
-data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';')
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';', nrows=200)
 train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
 
 # Model creation
@@ -161,7 +158,7 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 ###########################################################
 # TRAINING LOOP  ##########################################
 
-print('Datatrain dimension:', len(data_train*BATCH_SIZE)) # len(data_train) = batch number
+print('Datatrain dimension:', len(data_train)*BATCH_SIZE) # len(data_train) = batch number
 
 for epoch in range(NUM_EPOCHS):
     
@@ -188,7 +185,7 @@ for epoch in range(NUM_EPOCHS):
 
         total_training_loss += loss.item()
 
-        if(DEBAUG==True):
+        if(DEBUG==True):
                 print('sono alla ', i)
                 print('la loss gender è:', loss_gender.item(), 'labels:', labels[:,0])
                 print( ' la loss hat è:', loss_hat.item(), 'labels:',    labels[:,1])
@@ -196,7 +193,7 @@ for epoch in range(NUM_EPOCHS):
         print('Loss for', i, '\° branch over', len(data_train), 'is:', loss.item())
 
     # Validation
-    if (epoch + 1) % 2 == 0:
+    if (epoch + 1) % 5 == 0:
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
@@ -221,13 +218,13 @@ for epoch in range(NUM_EPOCHS):
 
                         # Calcola l'accuratezza per ciascun output
                         gender_pred = torch.sigmoid(gender) > 0.5
-                        accuracy_gender = (gender_pred == labels[:, 0].unsqueeze(1)).float().mean()
+                        accuracy_gender = (gender_pred.float() == labels[:, 0].unsqueeze(1)).float().mean()
 
                         hat_pred = torch.sigmoid(hat) > 0.5
-                        accuracy_hat = (hat_pred == labels[:, 1].unsqueeze(1)).float().mean()
+                        accuracy_hat = (hat_pred.float() == labels[:, 1].unsqueeze(1)).float().mean()
 
                         bag_pred = torch.sigmoid(bag) > 0.5
-                        accuracy_bag = (bag_pred == labels[:, 2].unsqueeze(1)).float().mean()
+                        accuracy_bag = (bag_pred.float() == labels[:, 2].unsqueeze(1)).float().mean()
 
                         val_acc_gender += accuracy_gender.item()
                         val_acc_hat += accuracy_hat.item()

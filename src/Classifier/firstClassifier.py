@@ -51,14 +51,18 @@ class CNNWithAttention(nn.Module):
         x = self.proj(x)
 
         # Attention layers
-        attn1, _ = self.attention1(x, x, x)   # [B, H*W, 256]
+        attn1, _= self.attention1(x, x, x)   # [B, H*W, 256]
         attn2, _ = self.attention2(x, x, x)   # [B, H*W, 256]
         attn3, _ = self.attention3(x, x, x)   # [B, H*W, 256]
         
         #ridurre la dimensione centrale
-        x1 = attn1.mean(dim=1)  # [B, 256]
-        x2 = attn2.mean(dim=1)  # [B, 256]
-        x3 = attn3.mean(dim=1)
+        # x1 = attn1.mean(dim=1)  # [B, 256]
+        # x2 = attn2.mean(dim=1)  # [B, 256]
+        # x3 = attn3.mean(dim=1)
+        x1 = attn1.max(dim=1).values
+        x2 = attn2.max(dim=1).values
+        x3 = attn3.max(dim=1).values
+
 
         # Passaggio attraverso i fully connected layers
         x1 = self.fc1(x1)  # [B, hidden_dim // 2]
@@ -72,7 +76,6 @@ class CNNWithAttention(nn.Module):
         x1 = self.dropout(x1)
         x2 = self.dropout(x2)
         x3 = self.dropout(x3)
-
 
         # Classifier
         out1 = self.classifier1(x1)  # [B, num_classes], num_classes perchè mi dà la probabilità
