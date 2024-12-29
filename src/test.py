@@ -25,7 +25,7 @@ print(f"Using device: {device}")
 
 classifier_model = CNNWithAttention()   
 classifier_model.to(device)
-checkpoint = torch.load('./src/Classifier/Models/checkpoint.pth')
+checkpoint = torch.load('./src/Classifier/Models/checkpoint_epoch_2_29_1915.pth')
 classifier_model.load_state_dict(checkpoint['model_state_dict'])
 
 # Carica l'epoca (opzionale, per riprendere l'addestramento)
@@ -33,18 +33,21 @@ epoch = checkpoint['epoch']
 losses = checkpoint['losses']  # Opzionale, per riprendere le perditclassifier_model.eval()
 
 transform = transforms.Compose([transforms.ToTensor(),
-				transforms.Resize((224, 224))])
+				transforms.Resize((224, 224)),
+                                # trainig set parameters 
+                                transforms.Normalize(mean=[0.4582, 0.4469, 0.4289], std=[0.2306, 0.2173, 0.2188])
+                                ])
 
 # Carica l'immagine da un percorso
-image_path = './src/Classifier/Datasets/validation_set/CAM17-2014-02-20-20140220171450-20140220172046-tarid93-frame1788-line1.jpg'  # Sostituisci con il percorso dell'immagine
+image_path = './src/Classifier/Datasets/training_set/CAM16-2014-03-26-20140326144140-20140326144727-tarid123-frame2915-line1.jpgD'  # Sostituisci con il percorso dell'immagine
 img = load_image(image_path)
 img=img.to(device)
 gender, hat, bag = classifier_model(img)
 
 
-gender_pred = torch.sigmoid(gender) > 0.5
-hat_pred = torch.sigmoid(hat) > 0.5
-bag_pred = torch.sigmoid(bag) > 0.5
+gender_pred = torch.sigmoid(gender)
+hat_pred = torch.sigmoid(hat)
+bag_pred = torch.sigmoid(bag)
 
 print("Gender: ", gender_pred)
 print("Hat: ", hat_pred)

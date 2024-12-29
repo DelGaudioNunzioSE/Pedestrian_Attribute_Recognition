@@ -14,7 +14,11 @@ class CNNWithAttention(nn.Module):
         # self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
 
         # ResNet Backbone
-        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    # resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        # VGG Backbone
+        resnet = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+        for param in resnet.parameters():
+            param.requires_grad = False
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
         self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
         self.proj = nn.Linear(self.resnet_out_channels, hidden_dim)

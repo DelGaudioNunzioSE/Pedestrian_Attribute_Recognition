@@ -34,13 +34,15 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 
 
 # Learning parameters
+VALIDATION = True # if we have to compute validaton too
+
 BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
-DATASET_SIZE = 92160//3  #Total number of samples: 92160
+DATASET_SIZE = 92160  #Total number of samples: 92160
 TEST_SIZE = 0.3
 LEARNING_RATE = 0.001
-NUM_EPOCHS = 5
+NUM_EPOCHS = 3
 EPOTH_SAVE = 0 # from which epoch start to save the model
-IMAGE_RESOLUTION = (120, 300) 
+IMAGE_RESOLUTION = (224, 224) 
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_HAT  = torch.tensor([55000/10500], device=DEVICE) # 10500 1 55000 0
 POS_WEIGHT_BAG  = torch.tensor([69000/9600], device=DEVICE) # 9600 1 # 69000 0
@@ -71,7 +73,7 @@ val_accuracies_tot = []
 
 # Checkpoint function
 def checkpoint_fuction():
-    timestamp = datetime.now().strftime('%d-%H:%M')  # Formato: DDMM_HHMMSS
+    timestamp = datetime.now().strftime('%d_%H%M')  # Formato: DDMM_HHMMSS
 
     checkpoint = {
         'model_state_dict': model.state_dict(),
@@ -89,7 +91,7 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
         criterion = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight) # object to evaluate sigmoid and then LOSS
 
-        loss = criterion(prediction, labels) # evaluate loss
+        loss = criterion(prediction, labels.unsqueeze(1)) # evaluate loss
 
         mask = labels != -1 #prendo tutti gli indici delle labels -1
         valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
@@ -121,12 +123,12 @@ TRANSFORMS = transforms.Compose([transforms.ToTensor(), # -> [C (number of chann
 
 
 # Changing the dataset
-rcsv=reorderCSV(batch_size=BATCH_SIZE ,csv_file=CSV_TRAINIG_FILE, new_csv_file=CSV_NEW_TRAINING_FILE)
-rcsv.print_new_csv()
+rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINIG_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
+DATASET_SIZE=rcsv.print_new_csv()
 
 
 # Reading new dataset
-data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';', nrows=200)
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';', nrows=DATASET_SIZE)
 train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
 
 # Model creation
@@ -135,8 +137,8 @@ model.to(DEVICE)
 
 # Object to load images
 # (csv_file -> in the first column there are the paths of the images)
-dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True)
-dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True)
+dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, Normalize=True)
+dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, Normalize=False)
 # TODO dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False)
 
 # DataLoader
@@ -195,7 +197,7 @@ for epoch in range(NUM_EPOCHS):
                 print('la loss gender è:', loss_gender.item(), 'labels:', labels[:,0])
                 print( ' la loss hat è:', loss_hat.item(), 'labels:',    labels[:,1])
                 print('la loss bag è:', loss_bag.item(), 'labels:',  labels[:,2])	
-        print(f'Loss for {i}° branch over', len(data_train), 'is:', loss.item())
+        print(f'Loss for {i}° branch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
 
     # Save the model and the optimizer
@@ -205,7 +207,7 @@ for epoch in range(NUM_EPOCHS):
 
 
     # Validation
-    if (epoch + 1) % 5 == 0:
+    if (VALIDATION == True):
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
@@ -314,15 +316,6 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
-checkpoint = {
-    'model_state_dict': model.state_dict(),
-    'optimizer_state_dict': optimizer.state_dict(),
-    'epoch': epoch,  # opzionale, per salvare l'epoca corrente
-    'losses': losses_tot,  # opzionale, per salvare la lista delle perdite
-}
-
-torch.save(checkpoint, './src/Classifier/Models/checkpoint.pth')
-print("Model and optimizer saved successfully!")
 
 
        
