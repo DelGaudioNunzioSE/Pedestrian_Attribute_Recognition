@@ -1,3 +1,4 @@
+from sklearn.metrics import f1_score
 import torch 
 import torch.nn as nn 
 import torch.optim as optim 
@@ -36,13 +37,24 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
+IMAGE_TYPE='RGB'
+
+# NON LI USARE !!!!!!
+TEST_MEAN= None # torch.tensor([0.4582, 0.4469, 0.4290])  # set None
+TEST_STD= None #torch.tensor([0.2306, 0.2173, 0.2187]) # set None
+
 BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
 DATASET_SIZE = 92160  #Total number of samples: 92160
-TEST_SIZE = 0.3
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 3
+TEST_SIZE = 0.2
+LEARNING_RATE = 0.1
+NUM_EPOCHS = 10
 EPOTH_SAVE = 0 # from which epoch start to save the model
 IMAGE_RESOLUTION = (224, 224) 
+
+GENDER_LOSS_WEIGHT = 0.2
+HAT_LOSS_WEIGHT = 0.4
+BAG_LOSS_WEIGHT = 0.4
+
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_HAT  = torch.tensor([55000/10500], device=DEVICE) # 10500 1 55000 0
 POS_WEIGHT_BAG  = torch.tensor([69000/9600], device=DEVICE) # 9600 1 # 69000 0
@@ -103,7 +115,13 @@ def adjustedLoss(prediction, labels, pos_weight ):
         return batch_loss
 
 
+def total_loss_fuction(loss_gender,loss_hat,loss_bag, gender_weight = 1/3, hat_weight=1/3, bag_weight=1/3):
+      if (gender_weight+hat_weight+bag_weight) != 1:
+            print('Total weight is not 1!')
 
+      total_loss= gender_weight * loss_gender + hat_weight * loss_hat + bag_weight * loss_bag
+      return total_loss
+      
 
 
 
@@ -137,8 +155,9 @@ model.to(DEVICE)
 
 # Object to load images
 # (csv_file -> in the first column there are the paths of the images)
-dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, Normalize=True)
-dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, Normalize=False)
+dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, mean=TEST_MEAN, std=TEST_STD, Normalize=True, ImageType=IMAGE_TYPE)
+train_mean, train_std = dataset_train.return_mean_and_std()
+dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, mean=train_mean, std=train_std, Normalize=True, ImageType=IMAGE_TYPE)
 # TODO dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False)
 
 # DataLoader
@@ -183,7 +202,7 @@ for epoch in range(NUM_EPOCHS):
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
         loss_hat = adjustedLoss(hat, labels[:,1],pos_weight=POS_WEIGHT_HAT)
         loss_bag = adjustedLoss(bag, labels[:,2],pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
-        loss = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag  # i pesi devono essere dinamici
+        loss = total_loss_fuction(loss_gender, loss_hat, loss_bag, gender_weight = GENDER_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT, bag_weight=BAG_LOSS_WEIGHT)
 
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -216,8 +235,12 @@ for epoch in range(NUM_EPOCHS):
         total_samples = 0
         loss_val = 0
 
+        val_f1_gender = 0
+        val_f1_hat = 0
+        val_f1_bag = 0
+
         with torch.no_grad():  # Disabilita il calcolo dei gradienti per la validazione
-                for images, labels in data_valid:  # Ciclo sui batch di validazione
+                for i, (images, labels) in enumerate(data_valid):  # Ciclo sui batch di validazione
                         images = images.to(DEVICE)
                         labels = labels.to(DEVICE)
                         gender, hat, bag = model(images)
@@ -226,7 +249,7 @@ for epoch in range(NUM_EPOCHS):
                         loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= POS_WEIGHT_GENDER)
                         loss_hat = adjustedLoss(hat, labels[:, 1], pos_weight= POS_WEIGHT_HAT)
                         loss_bag = adjustedLoss(bag, labels[:, 2], pos_weight= POS_WEIGHT_BAG)
-                        loss_val = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag
+                        loss_val = total_loss_fuction(loss_gender, loss_hat, loss_bag, gender_weight = GENDER_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT, bag_weight=BAG_LOSS_WEIGHT)
 
                         val_loss += loss_val.item()
 
@@ -243,7 +266,17 @@ for epoch in range(NUM_EPOCHS):
                         val_acc_gender += accuracy_gender.item()
                         val_acc_hat += accuracy_hat.item()
                         val_acc_bag += accuracy_bag.item()
+
+                        f1_gender = f1_score(labels[:, 0].cpu().numpy(), gender_pred.cpu().numpy(), average='macro')
+                        f1_hat = f1_score(labels[:, 1].cpu().numpy(), hat_pred.cpu().numpy(), average='macro')
+                        f1_bag = f1_score(labels[:, 2].cpu().numpy(), bag_pred.cpu().numpy(), average='macro')
+
                         total_samples += 1
+                        val_f1_gender += f1_gender
+                        val_f1_hat += f1_hat
+                        val_f1_bag += f1_bag
+
+                        print('Validation',i, 'over',len(data_valid))
 
     # Calcola la media delle perdite e delle accuratezze per la validazione
         val_loss /= total_samples
@@ -257,10 +290,12 @@ for epoch in range(NUM_EPOCHS):
         val_accuracies_gender.append(val_acc_gender)
         val_accuracies_hat.append(val_acc_hat)
         val_accuracies_bag.append(val_acc_bag)
+
         print(f"Train Loss: {losses_tot[-1]:.4f}, Validation Loss: {val_loss:.4f}")
-        print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}")
-        print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
-        print("Epoch: ",epoch)
+        print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}, Validation F1-Score (Gender): {val_f1_gender / total_samples:.4f}")
+        print(f"Validation Accuracy (Hat): {val_acc_hat:.4f},Validation F1-Score (Hat): {val_f1_hat / total_samples:.4f}")
+        print(f"Validation Accuracy (Bag): {val_acc_bag:.4f},Validation F1-Score (Bag): {val_f1_bag / total_samples:.4f}")
+
 
 
 

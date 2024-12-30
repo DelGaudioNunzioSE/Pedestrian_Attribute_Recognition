@@ -5,8 +5,10 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 class CSVDataset(Dataset):
-    def __init__(self, csv_file, train, transform=None, Normalize=True):
+    def __init__(self, csv_file, train, transform=None, mean=None, std =None, Normalize = True,ImageType='RGB'):
 
+        self.image_type=ImageType
+        
         self.data = csv_file #TOGLIERE nrows!!
         self.transform = transform #se vuoi fare augmentation
         self.train = train
@@ -16,9 +18,13 @@ class CSVDataset(Dataset):
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+        if (mean is None or std is None) and Normalize: 
+            self.mean, self.std = self.evaluate_mean_and_std()  # evaluate mean and std of the dataset
+        else:
+            self.mean, self.std =  mean, std 
+                    # Add normalization transform
 
-        self.mean, self.std = self.evaluate_mean_and_sdt() if Normalize else (None, None) # evaluate mean and std of the dataset
-        # Add normalization transform
+        # NORMALIZATION            
         if (Normalize==True):
             if self.transform is not None:
                 self.transform = transforms.Compose([
@@ -31,7 +37,7 @@ class CSVDataset(Dataset):
                     transforms.ToTensor(),
                     transforms.Normalize(mean=self.mean, std=self.std)
                 ])
-        print('mean:',self.mean, 'sdt:',self.std)
+        print('mean:',self.mean, 'std:',self.std)
 
 
     def __len__(self):
@@ -47,7 +53,7 @@ class CSVDataset(Dataset):
             img_path = self.TRAIN_IMAGES_PATH + img_path
         else:
             img_path = self.VALIDATION_IMAGES_PATH + img_path
-        image = Image.open(img_path).convert('RGB')
+        image = Image.open(img_path).convert(self.image_type)
 
         # Apply transformations
         if self.transform:
@@ -55,20 +61,25 @@ class CSVDataset(Dataset):
         
         # Return image and labels
         return image, torch.tensor(labels, dtype=torch.float)
+
     
 
 
-    def evaluate_mean_and_sdt(self):
+    def evaluate_mean_and_std(self):
         print('start evaluating mean and std')
-        mean = torch.zeros(3, device=self.device)  # Media per i 3 canali RGB
-        std = torch.zeros(3, device=self.device)   # Deviazione standard per i 3 canali RGB
+        if self.image_type == 'RGB':
+            mean = torch.zeros(3, device=self.device)  # Media per i 3 canali RGB
+            std = torch.zeros(3, device=self.device)   # Deviazione standard per i 3 canali RGB
+        else:
+            mean = torch.zeros(1, device=self.device)  # Media per i 3 canali RGB
+            std = torch.zeros(1, device=self.device)   # Deviazione standard per i 3 canali RGB
         n_samples = 0
 
         for idx in range(len(self.data)):
             img_path = self.data.iloc[idx, 0]
             img_path = self.TRAIN_IMAGES_PATH + img_path
 
-            image = Image.open(img_path).convert('RGB')
+            image = Image.open(img_path).convert(self.image_type)
             image = transforms.ToTensor()(image).to(self.device)  # Converte l'immagine in un tensore
 
             # Calcola la media e deviazione standard per ogni canale
@@ -80,3 +91,7 @@ class CSVDataset(Dataset):
         std /= n_samples
 
         return mean.cpu(), std.cpu()
+    
+
+    def return_mean_and_std(self):
+        return self.mean, self.std
