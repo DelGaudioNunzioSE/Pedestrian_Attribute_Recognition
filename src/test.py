@@ -4,7 +4,7 @@ from ultralytics import YOLO  # Ensure you have the Ultralytics YOLO library ins
 import os
 import json
 from torchvision import transforms
-from Classifier.firstClassifier import CNNWithAttention
+from Classifier.Classifier import CNNWithAttention
 from PIL import Image
 import torchvision.models as models
 import torch.nn as nn 
