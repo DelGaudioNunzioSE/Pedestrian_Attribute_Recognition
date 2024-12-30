@@ -5,3 +5,4 @@ src/Classifier/Datasets/
 !src/Classifier/Datasets/training_set.csv
 !src/Classifier/Datasets/validation_set.csv
 src/Classifier/Models/*
+*.png
