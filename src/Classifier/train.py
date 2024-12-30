@@ -106,7 +106,6 @@ if (REORDER == True):
         DATASET_SIZE=rcsv.print_new_csv()
         CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
 
-
 # Reading new dataset
 data = pd.read_csv(CSV_TRAINING_FILE, sep=';')
 train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
@@ -117,6 +116,7 @@ dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True
 train_mean, train_std = dataset_train.return_mean_and_std()
 dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, mean=train_mean, std=train_std, Normalize=True, ImageType=IMAGE_TYPE)
 # TODO dataset_test = CSVDataset(csv_file='./src/Classifier/Datasets/validation_set.csv', transform=None, train=False)
+
 
 # DataLoader
 # Test DataLoader
@@ -161,10 +161,8 @@ def calculate_class_weights(dataset):
 
     return np.array(sample_weights)
 
-
 class_weights = calculate_class_weights(dataset_train)
 sampler = WeightedRandomSampler(class_weights, len(dataset_train))
-
 #bc = BalancedBatchSampler(train_data,32)
 data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE,sampler=sampler) #batch di train
 # TODO data_test = DataLoader(dataset_test, batch_sampler=batch_sampler)
