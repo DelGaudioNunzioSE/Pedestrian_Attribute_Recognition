@@ -60,7 +60,7 @@ class CSVDataset(Dataset):
             image = self.transform(image)
         
         # Return image and labels
-        return image, torch.tensor(labels, dtype=torch.float)
+        return image, torch.tensor(labels.iloc[idx, 0:3], dtype=torch.float)
 
     
 
