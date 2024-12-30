@@ -21,17 +21,20 @@ data = {
 }
 
 #Dall'immagine del bounding box all'input della rete
-transform = transforms.Compose([transforms.ToTensor(),
-				transforms.Resize((224, 224))])
+transform= transforms.Compose([transforms.Resize(224), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
 
 
-def drawBox(box, frame,device):
+
+
+def drawBox(box, frame, device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
-    cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
+    cropped_img = Image.fromarray(cropped_img)
+    cropped_img = transform(cropped_img)
     cropped_img = cropped_img.unsqueeze(0).to(device)
+    
     return cropped_img
 
 
@@ -49,8 +52,10 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention()
-    checkpoint = torch.load('./src/Classifier/Models/checkpoint.pth')
-    classifier_model.load_state_dict(checkpoint['model_state_dict'])   
+    checkpoint = torch.load('./src/Classifier/Models/checkpoint_epoch_try.pth')
+    classifier_model.load_state_dict(checkpoint['model_state_dict'])
+    
+       
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
 

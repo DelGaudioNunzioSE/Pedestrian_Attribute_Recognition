@@ -2,22 +2,39 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+from ultralytics.nn.modules import CBAM
+from torchvision.models import ConvNeXt_Base_Weights
+
+
+class denseBlock(nn.Module):
+    def __init__(self, hidden_dim=1024):
+        super(denseBlock, self).__init__()
+        self.fc1 = nn.Linear(hidden_dim, hidden_dim // 2)
+        self.fc2 = nn.Linear(hidden_dim // 2, hidden_dim // 4)
+        self.fc3 = nn.Linear(hidden_dim // 4, hidden_dim // 8)
+        self.dropout = nn.Dropout(p=0.5)
+
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.dropout(x)
+
+        return x
+
+
 
 
 class CNNWithAttention(nn.Module):
     def __init__(self, num_classes=1, attention_heads=2, hidden_dim=256):
         super(CNNWithAttention, self).__init__()
 
-        # Custom CNN Backbone (Semplice CNN con 3 blocchi di convoluzione)
-        # self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1)
-        # self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
-        # self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1)
-
         # ResNet Backbone
-        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+        resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
         self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
-        self.proj = nn.Linear(self.resnet_out_channels, hidden_dim)
+        self.proj = nn.Linear(2048, hidden_dim)
 
         #self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
@@ -55,10 +72,7 @@ class CNNWithAttention(nn.Module):
         attn2, _ = self.attention2(x, x, x)   # [B, H*W, 256]
         attn3, _ = self.attention3(x, x, x)   # [B, H*W, 256]
         
-        #ridurre la dimensione centrale
-        # x1 = attn1.mean(dim=1)  # [B, 256]
-        # x2 = attn2.mean(dim=1)  # [B, 256]
-        # x3 = attn3.mean(dim=1)
+
         x1 = attn1.max(dim=1).values
         x2 = attn2.max(dim=1).values
         x3 = attn3.max(dim=1).values

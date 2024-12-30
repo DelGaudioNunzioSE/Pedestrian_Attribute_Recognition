@@ -9,8 +9,14 @@ from readDataset import CSVDataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-from reorderCSV import reorderCSV
 from datetime import datetime
+import torchvision.models as models
+from torch.optim import lr_scheduler
+from balancedBatchSampler import BalancedBatchSampler
+from collections import Counter
+import numpy as np
+from torch.utils.data import WeightedRandomSampler
+
 
 
 #
@@ -29,21 +35,21 @@ print(f"Using device: {DEVICE}")
 ############################################
 
 # Paths
-CSV_TRAINIG_FILE='./src/Classifier/Datasets/training_set.csv'
+CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
 CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 
 
 # Learning parameters
-BATCH_SIZE = 512 #Reduce if you have GPU's memory problems
+BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
 DATASET_SIZE = 92160//3  #Total number of samples: 92160
-TEST_SIZE = 0.3
-LEARNING_RATE = 0.001
-NUM_EPOCHS = 5
+TEST_SIZE = 0.2
+LEARNING_RATE = 0.0005
+NUM_EPOCHS = 10
 EPOTH_SAVE = 0 # from which epoch start to save the model
-IMAGE_RESOLUTION = (120, 300) 
+IMAGE_RESOLUTION = (224, 224) 
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
-POS_WEIGHT_HAT  = torch.tensor([55000/10500], device=DEVICE) # 10500 1 55000 0
-POS_WEIGHT_BAG  = torch.tensor([69000/9600], device=DEVICE) # 9600 1 # 69000 0
+POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) # 10500 1 55000 0
+POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE) # 9600 1 # 69000 0
 ############################################
 
 
@@ -79,7 +85,7 @@ def checkpoint_fuction():
         'epoch': epoch,  # save the current epoch
         'losses': losses_tot,  # save the list of losses
     }
-    checkpoint_filename = f'./src/Classifier/Models/checkpoint_epoch_{epoch}_{timestamp}.pth'
+    checkpoint_filename = f'./src/Classifier/Models/checkpoint_epoch_try.pth'
     torch.save(checkpoint, checkpoint_filename)
     print("Model and optimizer saved successfully!")
 
@@ -89,7 +95,7 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
         criterion = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight) # object to evaluate sigmoid and then LOSS
 
-        loss = criterion(prediction, labels) # evaluate loss
+        loss = criterion(prediction, labels.unsqueeze(1)) # evaluate loss
 
         mask = labels != -1 #prendo tutti gli indici delle labels -1
         valid_losses = loss[mask] #mi salvo le loss valide, con labels != -1
@@ -101,8 +107,34 @@ def adjustedLoss(prediction, labels, pos_weight ):
         return batch_loss
 
 
+def tpfpfn(pred,labels):
+        tp = ((pred == 1) & (labels.unsqueeze(1) == 1)).sum().item()
+        fp = ((pred == 1) & (labels.unsqueeze(1) == 0)).sum().item()
+        fn = ((pred == 0) & (labels.unsqueeze(1) == 1)).sum().item()
+        return tp,fp,fn
 
+def fscore(tp,fp,fn):
+        precision = tp / (tp + fp + 1e-8)
+        recall_gender = tp / (tp + fn + 1e-8)
+        f1 = 2 * (precision * recall_gender) / (precision + recall_gender + 1e-8)
+        return f1
 
+def gradnorm_loss(loss_gender, loss_hat, loss_bag):
+
+        inv_loss_gender = 1 / loss_gender
+        inv_loss_hat = 1 / loss_hat
+        inv_loss_bag = 1 / loss_bag
+
+        # Normalizzazione per rendere i pesi proporzionali
+        total_inv_loss = inv_loss_gender + inv_loss_hat + inv_loss_bag
+
+        fgender = inv_loss_gender / total_inv_loss
+        fhat = inv_loss_hat / total_inv_loss
+        fbag = inv_loss_bag / total_inv_loss
+
+        # Calcolo della perdita totale con pesi dinamici
+        loss = fgender * loss_gender + fhat * loss_hat + fbag * loss_bag
+        return loss
 
 
 ###########################################################
@@ -115,23 +147,44 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
 # Data Augmentation
 # Compose = Composition of transformations
-TRANSFORMS = transforms.Compose([transforms.ToTensor(), # -> [C (number of channels), H (height), W (width)] 
-				transforms.Resize(IMAGE_RESOLUTION) 
-							   ])
+TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
+                                transforms.Normalize([0.485, 0.456, 0.406],
+                                [0.229, 0.224, 0.225])
+])
 
 
-# Changing the dataset
-rcsv=reorderCSV(batch_size=BATCH_SIZE ,csv_file=CSV_TRAINIG_FILE, new_csv_file=CSV_NEW_TRAINING_FILE)
-rcsv.print_new_csv()
 
 
-# Reading new dataset
-data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';', nrows=200)
-train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
 
 # Model creation
 model = CNNWithAttention()   
 model.to(DEVICE)
+
+# model = models.vgg16(pretrained=True)
+# for param in model.parameters():
+#     param.requires_grad = False
+
+# input_features = model.classifier[0].in_features
+# model.classifier = nn.Sequential(
+#     nn.Linear(input_features, 256),
+#     nn.ReLU(),
+#     nn.Dropout(p=0.6),
+#     nn.Linear(256, 1),
+# )
+# model.to(DEVICE)
+
+def init_weights(m):
+    if isinstance(m, nn.Linear):
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+
+model.apply(init_weights)
+
+# Reading new dataset
+data = pd.read_csv(CSV_TRAINING_FILE, sep=';', nrows=10000)
+train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=7)
 
 # Object to load images
 # (csv_file -> in the first column there are the paths of the images)
@@ -142,7 +195,52 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True)
 # DataLoader
 # Test DataLoader
 # TODO TOERASE batch_sampler = CustomBatchSampler(dataset_train, batch_size=BATCH_SIZE)
-data_train = DataLoader(dataset_train, batch_size=BATCH_SIZE) #batch di train
+
+def calculate_class_weights(dataset):
+    """
+    Calcola i pesi per bilanciare le classi per ogni task e assegna un peso per ogni campione.
+    :param dataset: Dataset PyTorch
+    :return: Array di pesi per ogni campione
+    """
+    # Calcolati da preprocess con seed=65464
+    gender_dist = Counter({0: 49383, 1: 18952, -1: 6129})
+    bag_dist = Counter({0: 44237, -1: 21829, 1: 8398})
+    hat_dist = Counter({0: 54941, -1: 11838, 1: 7685})
+
+    scale_factor = 1000
+    gender_weights = {label: (1.0 / count) * scale_factor for label, count in gender_dist.items() if label != -1}
+    bag_weights = {label: (1.0 / count) * scale_factor for label, count in bag_dist.items() if label != -1}
+    hat_weights = {label: (1.0 / count) * scale_factor for label, count in hat_dist.items() if label != -1}
+
+    sample_weights = []
+    for i in range(len(dataset)):
+        # Estrai le etichette del campione
+        labels = np.array(dataset[i][1])
+
+        # Calcola i pesi per ogni task, assegnando 0.0 se l'etichetta è -1
+        gender_weight = gender_weights.get(labels[0], 0.0)
+        bag_weight = bag_weights.get(labels[1], 0.0)
+        hat_weight = hat_weights.get(labels[2], 0.0)
+
+        # Se tutte le label sono -1, assegna peso 0.0
+        if all(label == -1 for label in labels):
+            combined_weight = 0.0
+        else:
+            # Calcola il peso combinato come media dei pesi validi
+            combined_weight = np.mean([gender_weight, bag_weight, hat_weight])
+
+        #print(labels,combined_weight)
+
+        sample_weights.append(combined_weight)
+
+    return np.array(sample_weights)
+
+
+class_weights = calculate_class_weights(dataset_train)
+sampler = WeightedRandomSampler(class_weights, len(dataset_train))
+
+#bc = BalancedBatchSampler(train_data,32)
+data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE,sampler=sampler) #batch di train
 # TODO data_test = DataLoader(dataset_test, batch_sampler=batch_sampler)
 
 # Validation DataLoader
@@ -156,7 +254,10 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
 
 
 # Optimizer
+# Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) 
+
 
 
 
@@ -165,23 +266,27 @@ optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
 print('Datatrain dimension:', len(data_train)*BATCH_SIZE) # len(data_train) = batch number
 
+fgender, fhat, fbag = 1,1,1
 for epoch in range(NUM_EPOCHS):
     
     print("We are in Epoch number: ", epoch)
     total_training_loss = 0 # Loss reset for evry epoch
     model.train() # Training mode ENABLED
+    losses = []
 
     # Loop over the training batches
     for i, (images, labels) in enumerate(data_train):  # Ciclo sui batch di training
         # Forward pass
         images, labels = images.to(DEVICE), labels.to(DEVICE)
         gender, hat, bag = model(images)  # FORWARD PASS
-
+        #bag = model(images)
 
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
-        loss_hat = adjustedLoss(hat, labels[:,1],pos_weight=POS_WEIGHT_HAT)
-        loss_bag = adjustedLoss(bag, labels[:,2],pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
-        loss = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag  # i pesi devono essere dinamici
+        loss_bag = adjustedLoss(hat, labels[:,1],pos_weight=POS_WEIGHT_HAT)
+        loss_hat = adjustedLoss(bag, labels[:,2],pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
+        loss = loss_gender + loss_hat + loss_bag
+        #loss = gradnorm_loss(loss_gender, loss_hat, loss_bag)
+
 
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -205,7 +310,7 @@ for epoch in range(NUM_EPOCHS):
 
 
     # Validation
-    if (epoch + 1) % 5 == 0:
+    if (True):
         model.eval()  # Impostiamo il modello in modalità di valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
@@ -213,41 +318,80 @@ for epoch in range(NUM_EPOCHS):
         val_acc_bag = 0.0
         total_samples = 0
         loss_val = 0
+        tp_gender_tot = 0
+        fp_gender_tot = 0
+        fn_gender_tot = 0
+        tp_hat_tot = 0
+        fp_hat_tot = 0
+        fn_hat_tot = 0
+        tp_bag_tot = 0
+        fp_bag_tot = 0
+        fn_bag_tot = 0
+        losses_val=[]
+
+        w0,w1,w2 = fgender,fhat,fbag
 
         with torch.no_grad():  # Disabilita il calcolo dei gradienti per la validazione
                 for images, labels in data_valid:  # Ciclo sui batch di validazione
                         images = images.to(DEVICE)
                         labels = labels.to(DEVICE)
-                        gender, hat, bag = model(images)
+                        gender,hat,bag = model(images)
 
                         # Calcola le perdite
                         loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= POS_WEIGHT_GENDER)
-                        loss_hat = adjustedLoss(hat, labels[:, 1], pos_weight= POS_WEIGHT_HAT)
-                        loss_bag = adjustedLoss(bag, labels[:, 2], pos_weight= POS_WEIGHT_BAG)
-                        loss_val = (1 / 3) * loss_gender + (1 / 3) * loss_hat + (1 / 3) * loss_bag
+                        loss_bag = adjustedLoss(hat, labels[:, 1], pos_weight= POS_WEIGHT_HAT)
+                        loss_hat = adjustedLoss(bag, labels[:, 2], pos_weight= POS_WEIGHT_BAG)
 
+                        #loss_val = gradnorm_loss(loss_gender, loss_hat, loss_bag)
+                        loss_val = loss_gender + loss_hat + loss_bag
+                        
                         val_loss += loss_val.item()
 
-                        # Calcola l'accuratezza per ciascun output
+                        #Calcola l'accuratezza per ciascun output
                         gender_pred = torch.sigmoid(gender) > 0.5
                         accuracy_gender = (gender_pred.float() == labels[:, 0].unsqueeze(1)).float().mean()
-
-                        hat_pred = torch.sigmoid(hat) > 0.5
-                        accuracy_hat = (hat_pred.float() == labels[:, 1].unsqueeze(1)).float().mean()
+                        tp_gender, fp_gender, fn_gender = tpfpfn(gender_pred,labels[:,0])
+                        fgender = fscore(tp_gender, fp_gender, fn_gender)
 
                         bag_pred = torch.sigmoid(bag) > 0.5
-                        accuracy_bag = (bag_pred.float() == labels[:, 2].unsqueeze(1)).float().mean()
+                        accuracy_bag = (bag_pred.float() == labels[:, 1].unsqueeze(1)).float().mean()
+                        tp_bag, fp_bag, fn_bag = tpfpfn(bag_pred,labels[:,1])
+                        fbag = fscore(tp_bag, fp_bag, fn_bag)
+
+                        hat_pred = torch.sigmoid(hat) > 0.5
+                        accuracy_hat = (hat_pred.float() == labels[:, 2].unsqueeze(1)).float().mean()
+                        tp_hat, fp_hat, fn_hat = tpfpfn(hat_pred,labels[:,2])
+                        fhat = fscore(tp_hat, fp_hat, fn_hat)
+
 
                         val_acc_gender += accuracy_gender.item()
                         val_acc_hat += accuracy_hat.item()
                         val_acc_bag += accuracy_bag.item()
+
+                        tp_gender_tot += tp_gender
+                        fp_gender_tot += fp_gender
+                        fn_gender_tot += fn_gender
+
+                        tp_hat_tot += tp_hat
+                        fp_hat_tot += fp_hat
+                        fn_hat_tot += fn_hat
+
+                        tp_bag_tot += tp_bag
+                        fp_bag_tot += fp_bag
+                        fn_bag_tot += fn_bag
+
                         total_samples += 1
 
     # Calcola la media delle perdite e delle accuratezze per la validazione
         val_loss /= total_samples
         val_acc_gender /= total_samples
+
         val_acc_hat /= total_samples
         val_acc_bag /= total_samples
+
+        fgender = fscore(tp_gender_tot, fp_gender_tot, fn_gender_tot)
+        fhat = fscore(tp_hat_tot, fp_hat_tot, fn_hat_tot)
+        fbag = fscore(tp_bag_tot, fp_bag_tot, fn_bag_tot)
 
         # Salvo i valori di validazione per ogni epoca
         losses_tot.append(total_training_loss / len(data_train))
@@ -258,6 +402,12 @@ for epoch in range(NUM_EPOCHS):
         print(f"Train Loss: {losses_tot[-1]:.4f}, Validation Loss: {val_loss:.4f}")
         print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}")
         print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
+        print(f"Tp (Gender): {tp_gender_tot:.4f}, Fp (Gender): {fp_gender_tot:.4f}, Fn (Gender): {fn_gender_tot}")
+        print(f"Tp (Hat): {tp_hat_tot:.4f}, Fp (Hat): {fp_hat_tot:.4f}, Fn (hat): {fn_hat_tot}")
+        print(f"Tp (Bag): {tp_bag_tot:.4f}, Fp (Bag): {fp_bag_tot:.4f}, Fn (Bag): {fn_bag_tot}")
+        print(f"Fscore (Gender): {fgender:.2f}, Fscore (Hat): {fhat:.2f}, Fbag (Bag): {fbag}")
+        print("Total Validation Samples: ", len(data_valid) * BATCH_SIZE)
+
         print("Epoch: ",epoch)
 
 
@@ -272,7 +422,9 @@ plt.ylabel('Loss')
 plt.title('Validation Loss')
 plt.grid(True)
 plt.legend()
+plt.savefig('validation_loss.png')
 plt.show()
+
 
 # Plot della Validation Accuracy per Gender
 plt.figure(figsize=(8, 6))
@@ -282,7 +434,9 @@ plt.ylabel('Accuracy')
 plt.title('Validation Accuracy (Gender)')
 plt.grid(True)
 plt.legend()
+plt.savefig('accuracy_gender.png')
 plt.show()
+
 
 # Plot della Validation Accuracy per Hat
 plt.figure(figsize=(8, 6))
@@ -292,7 +446,9 @@ plt.ylabel('Accuracy')
 plt.title('Validation Accuracy (Hat)')
 plt.grid(True)
 plt.legend()
+plt.savefig('accuracy_hat.png')
 plt.show()
+
 
 # Plot della Validation Accuracy per Bag
 plt.figure(figsize=(8, 6))
@@ -302,7 +458,9 @@ plt.ylabel('Accuracy')
 plt.title('Validation Accuracy (Bag)')
 plt.grid(True)
 plt.legend()
+plt.savefig('accuracy_bag.png')
 plt.show()
+
 
 plt.figure(figsize=(8, 6))
 plt.plot(losses_tot, label='Train Loss', color='blue', marker='o')
@@ -312,7 +470,9 @@ plt.ylabel('Loss')
 plt.title('Training Loss vs Validation Loss')
 plt.legend()
 plt.grid(True)
+plt.savefig('TrainVsValidation.png')
 plt.show()
+
 
 checkpoint = {
     'model_state_dict': model.state_dict(),
