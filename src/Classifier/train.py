@@ -9,14 +9,13 @@ from SupportScripts.DataRefactor.readDataset import CSVDataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
 from torch.optim import lr_scheduler
-from collections import Counter
-import numpy as np
 from torch.utils.data import WeightedRandomSampler
 
 # OUR IMPORTS
 from SupportScripts.checkpoint import checkpoint_fuction
 from classifier import CNNWithAttention
-from tester import *
+from SupportScripts.adjustedLoss import adjustedLoss, total_loss_fuction
+from SupportScripts.tester import Tester
 from SupportScripts.device import device_selecter
 from SupportScripts.calculateClassWeights import calculate_class_weights
 
@@ -174,7 +173,7 @@ for epoch in range(NUM_EPOCHS):
         print(f'Loss for {i}° batch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
     # adaptive learning rate
-    LEARNING_RATE=LEARNING_RATE*epoch
+    LEARNING_RATE=LEARNING_RATE*(epoch+1)
 
 
     print('Saving model and optimizer...')

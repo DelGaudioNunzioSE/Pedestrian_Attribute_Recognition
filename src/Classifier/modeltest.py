@@ -6,11 +6,11 @@ import torchvision.transforms as transforms
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader
 
-from Classifier.classifier import CNNWithAttention
-from Classifier.SupportScripts.DataRefactor.readDataset import CSVDataset
-from Classifier.SupportScripts.adjustedLoss import *
-from Classifier.SupportScripts.device import device_selecter
-from Classifier.tester import Tester
+from classifier import CNNWithAttention
+from SupportScripts.DataRefactor.readDataset import CSVDataset
+from SupportScripts.adjustedLoss import *
+from SupportScripts.device import device_selecter
+from SupportScripts.tester import Tester
 
 
 TEST_MEAN = torch.tensor([0.4582, 0.4469, 0.4290])
