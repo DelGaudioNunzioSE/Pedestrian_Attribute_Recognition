@@ -46,8 +46,8 @@ GENDER_LOSS_WEIGHT = 0.2
 HAT_LOSS_WEIGHT = 0.5
 BAG_LOSS_WEIGHT = 0.3
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
-POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
+POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
 
 #########################################################################################
 
@@ -152,9 +152,9 @@ for epoch in range(NUM_EPOCHS):
         gender, bag, hat = model(images)  # FORWARD PASS
 
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
-        loss_bag = adjustedLoss(bag, labels[:,1],pos_weight=POS_WEIGHT_HAT)
-        loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_BAG) #unsqueeze ha fatto 32x1
-        loss = total_loss_fuction(loss_gender, loss_bag, loss_hat, gender_weight = GENDER_LOSS_WEIGHT, bag_weight=BAG_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT)
+        loss_bag = adjustedLoss(bag, labels[:,1],pos_weight=POS_WEIGHT_BAG)
+        loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_HAT) #unsqueeze ha fatto 32x1
+        loss = total_loss_fuction(loss_gender=loss_gender, loss_bag=loss_bag, loss_hat=loss_hat, gender_weight = GENDER_LOSS_WEIGHT, bag_weight=BAG_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT)
         #loss = gradnorm_loss(loss_gender, loss_hat, loss_bag)
 
 
