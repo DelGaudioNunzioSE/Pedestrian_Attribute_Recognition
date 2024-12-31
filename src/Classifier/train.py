@@ -4,7 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 from SupportScripts.DataRefactor.reorderCSV import reorderCSV
 import pandas as pd
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from SupportScripts.DataRefactor.readDataset import CSVDataset
 from torchvision import transforms
 from sklearn.model_selection import train_test_split
@@ -20,16 +20,17 @@ from tester import *
 from SupportScripts.device import device_selecter
 from SupportScripts.calculateClassWeights import calculate_class_weights
 
+DEVICE=device_selecter()
 
 
 # Setup #########################################################################
 DEBUG = False
 TIMESTAMP = True
-REORDER=False # Nunzio's reorder
-CLASS_WEIGHTS= False # use differente weights for class distribution
-IMAGE_TYPE='RGB'
+CLASS_WEIGHTS= False # Paolo's
 
-DEVICE=device_selecter()
+# Nunzio's
+REORDER=False # Nunzio's reorder
+IMAGE_TYPE='RGB'
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -39,15 +40,16 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = 256 #Reduce if you have GPU's memory problems
-TEST_SIZE = 0.2
+VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.0001
-NUM_EPOCHS = 100
+NUM_EPOCHS = 3
 GENDER_LOSS_WEIGHT = 0.2
-HAT_LOSS_WEIGHT = 0.4
-BAG_LOSS_WEIGHT = 0.4
-POS_WEIGHT_GENDER = 1 #torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
-POS_WEIGHT_HAT  = 1 #torch.tensor([(68629/14811)], device=DEVICE) # 10500 1 55000 0
-POS_WEIGHT_BAG  = 1 #torch.tensor([55168/10516], device=DEVICE) # 9600 1 # 69000 0
+HAT_LOSS_WEIGHT = 0.5
+BAG_LOSS_WEIGHT = 0.3
+POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
+POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
+POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
+
 #########################################################################################
 
 
@@ -68,15 +70,15 @@ TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
 
 ##### DATASET ######################################
 ####################################################
-if (REORDER == True):
-        rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
-        DATASET_SIZE=rcsv.print_new_csv()
-        CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
+
+rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
+DATASET_SIZE=rcsv.erase_invalid_row()
+CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
 
 
 # Reading new dataset
 data = pd.read_csv(CSV_TRAINING_FILE, sep=';')
-train_data, val_data = train_test_split(data, test_size=TEST_SIZE, random_state=42)
+train_data, val_data = train_test_split(data, test_size=VALIDATION_SIZE, random_state=42)
 
 dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE)
 dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE)
@@ -85,15 +87,18 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, 
 
 
 # Change class weight
+print('Starting evaluating weights...')
 if CLASS_WEIGHTS == True:
     class_weights = calculate_class_weights(dataset_train)
     sampler = WeightedRandomSampler(class_weights, len(dataset_train))
 else:
-     sampler=None
+    sampler = RandomSampler(dataset_train)
+    valid_sampler = SequentialSampler(dataset_valid)
+
 
 #Dataset
-data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE,sampler=sampler) #batch di train
-data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
+data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE, sampler=sampler) #batch di train
+data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE, sampler=valid_sampler)
 
 
 
@@ -168,11 +173,14 @@ for epoch in range(NUM_EPOCHS):
                 print( 'la loss hat è:', loss_hat.item(), 'labels:',    labels[:,2])	
         print(f'Loss for {i}° batch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
+    # adaptive learning rate
+    LEARNING_RATE=LEARNING_RATE*epoch
 
 
     print('Saving model and optimizer...')
     model_to_validate=checkpoint_fuction(TIMESTAMP, model, optimizer, epoch)
 
+    scheduler.step()
 
     # Validation
     if (VALIDATION == True):

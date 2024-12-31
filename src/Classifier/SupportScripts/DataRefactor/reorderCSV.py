@@ -9,8 +9,7 @@ class reorderCSV():
         # convert the dataset to numpy
         self.dataset = self.dataset_csv.to_numpy()
         # remove rows with -1 for evry column
-        mask = np.all(self.dataset[:, 1:4] == -1, axis=1)
-        self.dataset = self.dataset[~mask]
+        
         np.random.shuffle(self.dataset) # shuffle on rows
 
         self.BATCH_SIZE = BATCH_SIZE
@@ -18,7 +17,6 @@ class reorderCSV():
         self.new_dataset = np.empty((0, 4))  # inizialize the branch
 
         self.NEW_FILE_PATH = NEW_FILE_PATH
-    
 
         
     def find_valid_row(self): # find the first valid row
@@ -128,6 +126,19 @@ class reorderCSV():
         new_csv = pd.DataFrame(self.new_dataset)
         new_csv.to_csv(self.NEW_FILE_PATH, sep=';', index=False, header=False)
         print(f"Balanced dataset saved to {self.NEW_FILE_PATH}")
+
+
+    def erase_invalid_row(self):
+        
+        mask = np.all(self.dataset[:, 1:4] == -1, axis=1)
+        self.dataset = self.dataset[~mask]
+
+        new_csv= pd.DataFrame(self.dataset)
+        new_csv.to_csv(self.NEW_FILE_PATH, sep=';', index=False, header=False)
+
+        print('Erased invalid row')
+
+        return new_csv.shape[0] # Return the number of rows in the new csv
 
 
 
