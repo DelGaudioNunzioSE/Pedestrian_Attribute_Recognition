@@ -174,7 +174,6 @@ class Tester:
         plt.grid(True)
         plt.legend()
         plt.savefig('./src/Classifier/Plots/validation_loss.png')
-        plt.show()
 
 
         # Plot della Validation Accuracy per Gender
@@ -186,7 +185,6 @@ class Tester:
         plt.grid(True)
         plt.legend()
         plt.savefig('./src/Classifier/Plots/accuracy_gender.png')
-        plt.show()
 
 
         # Plot della Validation Accuracy per Hat
@@ -198,7 +196,6 @@ class Tester:
         plt.grid(True)
         plt.legend()
         plt.savefig('./src/Classifier/Plots/accuracy_hat.png')
-        plt.show()
 
 
         # Plot della Validation Accuracy per Bag
@@ -210,7 +207,6 @@ class Tester:
         plt.grid(True)
         plt.legend()
         plt.savefig('./src/Classifier/Plots/accuracy_bag.png')
-        plt.show()
 
 
         plt.figure(figsize=(8, 6))
@@ -222,7 +218,6 @@ class Tester:
         plt.legend()
         plt.grid(True)
         plt.savefig('./src/Classifier/Plots/TrainVsValidation.png')
-        plt.show()
 
 
 
