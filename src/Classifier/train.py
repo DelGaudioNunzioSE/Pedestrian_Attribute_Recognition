@@ -29,7 +29,7 @@ CLASS_WEIGHTS= False # Paolo's
 
 # Nunzio's
 REORDER=False # Nunzio's reorder
-IMAGE_TYPE='RGB'
+IMAGE_TYPE='L' # RGB or L balck and white
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -56,12 +56,18 @@ POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE)
 
 ##### DATA AUGMENTATION ######################################
 ####################################################
-TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
+if IMAGE_TYPE=='L':
+    TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
                                 transforms.RandomHorizontalFlip(),
                                 transforms.ToTensor(),
-                                transforms.Normalize([0.4582, 0.4469, 0.4290],
-                                [0.2306, 0.2173, 0.2187])
-])
+                                transforms.Normalize(mean=[0.5], std=[0.5])
+    ])
+else: 
+    TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
+                                    transforms.RandomHorizontalFlip(),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([0.4582, 0.4469, 0.4290],[0.2306, 0.2173, 0.2187])
+    ])
 
 
 
@@ -105,7 +111,7 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE, sampler=valid_samp
 ##### MODELLO ######################################
 ####################################################
 # Model creation
-model = CNNWithAttention()   
+model = CNNWithAttention(channel=IMAGE_TYPE)   
 model.to(DEVICE)
 
 def init_weights(m):

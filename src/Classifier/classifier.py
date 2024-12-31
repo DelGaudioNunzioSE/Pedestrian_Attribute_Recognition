@@ -27,11 +27,13 @@ class denseBlock(nn.Module):
 
 
 class CNNWithAttention(nn.Module):
-    def __init__(self, num_classes=1, attention_heads=2, hidden_dim=256):
+    def __init__(self, num_classes=1, attention_heads=2, hidden_dim=256, channel='RGB'):
         super(CNNWithAttention, self).__init__()
 
         # ResNet Backbone
         resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        if(channel == 'L'): # use black and white images <---
+            resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
         self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
         self.proj = nn.Linear(2048, hidden_dim)

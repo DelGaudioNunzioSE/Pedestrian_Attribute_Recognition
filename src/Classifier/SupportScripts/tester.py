@@ -36,6 +36,11 @@ class Tester:
         self.val_accuracies_hat = [] 
         self.val_accuracies_tot = [] 
 
+        self.f1_gender = [] 
+        self.f1_bag = [] 
+        self.f1_hat = [] 
+        self.f1_tot = [] 
+
         self.POS_WEIGHT_GENDER=POS_WEIGHT_GENDER
         self.POS_WEIGHT_BAG=POS_WEIGHT_BAG
         self.POS_WEIGHT_HAT=POS_WEIGHT_HAT
@@ -147,6 +152,12 @@ class Tester:
         self.val_accuracies_gender.append(val_acc_gender)
         self.val_accuracies_hat.append(val_acc_hat)
         self.val_accuracies_bag.append(val_acc_bag)
+
+        self.f1_tot.append((fgender+fhat+fbag)/3)
+        self.f1_gender.append(fgender)
+        self.f1_hat.append(fhat)
+        self.f1_bag.append(fbag)
+
         print(f" Validation Loss: {val_loss:.4f}")
         print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}")
         print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
@@ -200,6 +211,37 @@ class Tester:
         plt.grid(True)
         plt.legend()
         plt.savefig('./src/Classifier/Plots/accuracy_bag_'+ plots_name+'.png')
+
+        # Plot del Validation F1 Score per Gender
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(1, len(self.f1_gender) + 1), self.f1_gender, label='F1 Score (Gender)', marker='o')
+        plt.xlabel('Epochs')
+        plt.ylabel('F1 Score')
+        plt.title('Validation F1 Score (Gender)')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('./src/Classifier/Plots/f1_score_gender_' + plots_name + '.png')
+
+        # Plot del Validation F1 Score per Hat
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(1, len(self.f1_hat) + 1), self.f1_hat, label='F1 Score (Hat)', marker='o')
+        plt.xlabel('Epochs')
+        plt.ylabel('F1 Score')
+        plt.title('Validation F1 Score (Hat)')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('./src/Classifier/Plots/f1_score_hat_' + plots_name + '.png')
+
+        # Plot del Validation F1 Score per Bag
+        plt.figure(figsize=(8, 6))
+        plt.plot(range(1, len(self.f1_bag) + 1), self.f1_bag, label='F1 Score (Bag)', marker='o')
+        plt.xlabel('Epochs')
+        plt.ylabel('F1 Score')
+        plt.title('Validation F1 Score (Bag)')
+        plt.grid(True)
+        plt.legend()
+        plt.savefig('./src/Classifier/Plots/f1_score_bag_' + plots_name + '.png')
+
 
 
 

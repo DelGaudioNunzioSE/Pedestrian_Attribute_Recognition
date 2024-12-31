@@ -21,11 +21,15 @@ BATCH_SIZE = int(512/2)
 
 transform = transforms.Compose([transforms.ToTensor(),
 				                transforms.Resize((224, 224)),
+                                transforms.Normalize([0.4582, 0.4469, 0.4290],
+                                [0.2306, 0.2173, 0.2187])
                                ])
 
 
+MODEL= 'checkpoint_2_31_1452'
 CSV_TEST_FILE='./src/Classifier/Datasets/validation_set.csv'
-MODEL_PATH='./src/Classifier/Models/checkpoint_2_31_1452.pth'
+
+MODEL_PATH='./src/Classifier/Models/'+ MODEL +'.pth'
 data = pd.read_csv(CSV_TEST_FILE, sep=';')
 dataset_test= CSVDataset(csv_file=data, transform=transform, train=False, ImageType=IMAGE_TYPE)
 data_test= DataLoader(dataset_test, batch_size=BATCH_SIZE)
