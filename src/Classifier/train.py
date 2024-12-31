@@ -38,10 +38,10 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = 256 #Reduce if you have GPU's memory problems
+BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.0001
-NUM_EPOCHS = 3
+NUM_EPOCHS = 10
 GENDER_LOSS_WEIGHT = 0.2
 HAT_LOSS_WEIGHT = 0.5
 BAG_LOSS_WEIGHT = 0.3
@@ -173,18 +173,18 @@ for epoch in range(NUM_EPOCHS):
         print(f'Loss for {i}° batch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
     # adaptive learning rate
-    LEARNING_RATE=LEARNING_RATE*(epoch+1)
+    # LEARNING_RATE=LEARNING_RATE*(epoch+1)
 
 
     print('Saving model and optimizer...')
-    model_to_validate=checkpoint_fuction(TIMESTAMP, model, optimizer, epoch)
+    plots_name=checkpoint_fuction(TIMESTAMP, model, optimizer, epoch)
 
     scheduler.step()
 
     # Validation
     if (VALIDATION == True):
         validator.test(model,GENDER_LOSS_WEIGHT, BAG_LOSS_WEIGHT,HAT_LOSS_WEIGHT)
-        validator.plot()
+        validator.plot(plots_name)
 
 
 

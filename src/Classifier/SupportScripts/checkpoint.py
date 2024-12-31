@@ -15,7 +15,8 @@ def checkpoint_fuction(timestamp, model, optimizer, epoch):
         'optimizer_state_dict': optimizer.state_dict(),
         'epoch': epoch,  # save the current epoch
     }
+    epoch_and_timestamp = f'_{epoch}_{timestamp}'
     checkpoint_filename = f'./src/Classifier/Models/checkpoint_{epoch}_{timestamp}.pth'
     torch.save(checkpoint, checkpoint_filename)
     print("Model and optimizer saved successfully!")
-    return checkpoint_filename
+    return epoch_and_timestamp

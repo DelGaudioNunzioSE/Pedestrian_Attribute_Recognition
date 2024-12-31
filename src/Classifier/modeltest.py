@@ -25,7 +25,7 @@ transform = transforms.Compose([transforms.ToTensor(),
 
 
 CSV_TEST_FILE='./src/Classifier/Datasets/validation_set.csv'
-MODEL_PATH='./src/Classifier/Models/checkpoint_1_31_0459.pth'
+MODEL_PATH='./src/Classifier/Models/checkpoint_2_31_1452.pth'
 data = pd.read_csv(CSV_TEST_FILE, sep=';')
 dataset_test= CSVDataset(csv_file=data, transform=transform, train=False, ImageType=IMAGE_TYPE)
 data_test= DataLoader(dataset_test, batch_size=BATCH_SIZE)
@@ -35,3 +35,4 @@ checkpoint = torch.load(MODEL_PATH)
 model.load_state_dict(checkpoint['model_state_dict'])
 tester=Tester(data_test, BATCH_SIZE)
 tester.test(model)
+print('Model:'+ MODEL_PATH)

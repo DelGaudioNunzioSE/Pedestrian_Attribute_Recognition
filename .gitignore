@@ -6,3 +6,4 @@ src/Classifier/Datasets/
 !src/Classifier/Datasets/validation_set.csv
 src/Classifier/Models/*
 *.png
+*.jpg

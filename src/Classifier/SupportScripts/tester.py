@@ -21,8 +21,6 @@ class Tester:
         self.losses_hat = [] 
         self.losses_gender = [] 
         self.losses_bag = [] 
-        self.losses_tot = [] 
-        self.total_training_loss = 0
 
         self.accuracies_hat = []
         self.accuracies_gender = [] 
@@ -89,8 +87,8 @@ class Tester:
 
                 # Calcola le perdite
                 loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= self.POS_WEIGHT_GENDER)
-                loss_bag = adjustedLoss(hat, labels[:, 1], pos_weight= self.POS_WEIGHT_BAG)
-                loss_hat = adjustedLoss(bag, labels[:, 2], pos_weight= self.POS_WEIGHT_HAT)
+                loss_bag = adjustedLoss(bag, labels[:, 1], pos_weight= self.POS_WEIGHT_HAT)
+                loss_hat = adjustedLoss(hat, labels[:, 2], pos_weight= self.POS_WEIGHT_BAG)
 
                         #loss_val = gradnorm_loss(loss_gender, loss_hat, loss_bag)
                 loss_val = total_loss_fuction(loss_gender,loss_bag,loss_hat, gender_weight,  bag_weight, hat_weight)
@@ -145,12 +143,11 @@ class Tester:
         fbag = self.fscore(tp_bag_tot, fp_bag_tot, fn_bag_tot)
 
         # Salvo i valori di validazione per ogni epoca
-        self.losses_tot.append(self.total_training_loss / len(self.data_test))
         self.val_losses_tot.append(val_loss)
         self.val_accuracies_gender.append(val_acc_gender)
         self.val_accuracies_hat.append(val_acc_hat)
         self.val_accuracies_bag.append(val_acc_bag)
-        print(f"Train Loss: {self.losses_tot[-1]:.4f}, Validation Loss: {val_loss:.4f}")
+        print(f" Validation Loss: {val_loss:.4f}")
         print(f"Validation Accuracy (Gender): {val_acc_gender:.4f}")
         print(f"Validation Accuracy (Hat): {val_acc_hat:.4f}, Validation Accuracy (Bag): {val_acc_bag:.4f}")
         print(f"Tp (Gender): {tp_gender_tot:.4f}, Fp (Gender): {fp_gender_tot:.4f}, Fn (Gender): {fn_gender_tot}")
@@ -160,7 +157,8 @@ class Tester:
         print("Total Validation Samples: ", len(self.data_test) * self.batch_size)
 
 
-    def plot(self):
+
+    def plot(self, plots_name='test'):
         plt.figure(figsize=(8, 6))
         plt.plot(range(1, len(self.val_losses_tot) + 1), self.val_losses_tot, label='Validation Loss', marker='o')
         plt.xlabel('Epochs')
@@ -168,7 +166,7 @@ class Tester:
         plt.title('Validation Loss')
         plt.grid(True)
         plt.legend()
-        plt.savefig('./src/Classifier/Plots/validation_loss.png')
+        plt.savefig('./src/Classifier/Plots/validation_loss_'+ plots_name+'.png')
 
 
         # Plot della Validation Accuracy per Gender
@@ -179,7 +177,7 @@ class Tester:
         plt.title('Validation Accuracy (Gender)')
         plt.grid(True)
         plt.legend()
-        plt.savefig('./src/Classifier/Plots/accuracy_gender.png')
+        plt.savefig('./src/Classifier/Plots/accuracy_gender_'+ plots_name+'.png')
 
 
         # Plot della Validation Accuracy per Hat
@@ -190,7 +188,7 @@ class Tester:
         plt.title('Validation Accuracy (Hat)')
         plt.grid(True)
         plt.legend()
-        plt.savefig('./src/Classifier/Plots/accuracy_hat.png')
+        plt.savefig('./src/Classifier/Plots/accuracy_hat_'+ plots_name+'.png')
 
 
         # Plot della Validation Accuracy per Bag
@@ -201,18 +199,9 @@ class Tester:
         plt.title('Validation Accuracy (Bag)')
         plt.grid(True)
         plt.legend()
-        plt.savefig('./src/Classifier/Plots/accuracy_bag.png')
+        plt.savefig('./src/Classifier/Plots/accuracy_bag_'+ plots_name+'.png')
 
 
-        plt.figure(figsize=(8, 6))
-        plt.plot(self.losses_tot, label='Train Loss', color='blue', marker='o')
-        plt.plot(self.val_losses_tot, label='Validation Loss', color='red', marker='x')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.title('Training Loss vs Validation Loss')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig('./src/Classifier/Plots/TrainVsValidation.png')
 
 
 
