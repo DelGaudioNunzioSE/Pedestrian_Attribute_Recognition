@@ -73,12 +73,12 @@ def real_to_camera(point_x, point_y, point_z, camera_x, camera_y, camera_z,  the
     UVW_point = UVW(x=point_x, y=point_y, z=point_z)
     XYZ = transformation_matrix @ UVW_point
 
-    print("rotation:")
+    '''print("rotation:")
     print(rotation_matrix)
     print("transformation_matrix:")
     print(transformation_matrix)
     print("XYZ:")
-    print(XYZ)
+    print(XYZ)'''
     return XYZ
 
 
@@ -114,16 +114,16 @@ def camera_to_plane(XYZ,focal, resolution_x, resolution_y, sensor_x, sensor_y):
     xy = np.array([x, y])  # Coordinata omogenea normalizzata  
 
 
-    print("fx:")
-    print(fx)
-    print("fy:")
-    print(fy)
-    print("perspective_projection:")
-    print(perspective_projection)
-    print("uvw:")
-    print(uvw)
-    print("xy:")
-    print(xy)
+    #print("fx:")
+    #print(fx)
+    #print("fy:")
+    #print(fy)
+    #print("perspective_projection:")
+    #print(perspective_projection)
+    #print("uvw:")
+    #print(uvw)
+    #print("xy:")
+    #print(xy)
 
     return xy
 
@@ -143,12 +143,12 @@ def plane_to_pixel(xy):
 
 def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thyaw, thpitch, throll, focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
-    print("larghezza ed altezza immagine:")
-    print(resolution_x,resolution_y)
+    #print("larghezza ed altezza immagine:")
+    #print(resolution_x,resolution_y)
 
     for i in range(len(x_real)):
-        print("point:")
-        print(x_real[i], y_real[i], z_real[i])
+        #print("point:")
+        #print(x_real[i], y_real[i], z_real[i])
 
         XYZ=real_to_camera(point_x=x_real[i], point_y=y_real[i], point_z=z_real[i], camera_x=camera_x, camera_y=camera_y, camera_z=camera_z, theta_x=thpitch, theta_y=throll, theta_z=thyaw)
         
@@ -158,8 +158,8 @@ def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thy
 
         u,v= plane_to_pixel(xy)
         point = ((u), (v))
-        print("u e v sono:")
-        print(point)
+        #print("u e v sono:")
+        #print(point)
 
 
         cv2.circle(image, point, radius=5, color=(0, 0, 255), thickness=-1)  # Cerchi rossi
@@ -168,8 +168,40 @@ def draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thy
 
     return image
 
+ #Disegna i punti sull'immagine
+
+def points(x_real, y_real, z_real, camera_x, camera_y, camera_z, thyaw, thpitch, throll, focal, resolution_x, resolution_y, sensor_x, sensor_y):
+
+    #print("larghezza ed altezza immagine:")
+    #print(resolution_x,resolution_y)
+    points=[]
+    for i in range(len(x_real)):
+        #print("point:")
+        #print(x_real[i], y_real[i], z_real[i])
+
+        XYZ=real_to_camera(point_x=x_real[i], point_y=y_real[i], point_z=z_real[i], camera_x=camera_x, camera_y=camera_y, camera_z=camera_z, theta_x=thpitch, theta_y=throll, theta_z=thyaw)
+        
+
+        xy=camera_to_plane(XYZ,focal=focal,resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
+    
+
+        u,v= plane_to_pixel(xy)
+        point = ((u), (v))
+        #print("u e v sono:")
+        #print(point)
+        points.append(point)
+
+        #cv2.circle(image, point, radius=5, color=(0, 0, 255), thickness=-1)  # Cerchi rossi
+
+        #print('-----------------------------------------------')
+
+    return points
 
 
 def inversion_draw_points(image, x_real, y_real, z_real, camera_x, camera_y, camera_z, thpitch, throll, thyaw, focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
     return draw_points(image=image, x_real=x_real, y_real=z_real, z_real=y_real, camera_x=camera_x, camera_y=camera_z, camera_z=camera_y, thyaw=throll, thpitch=thpitch, throll=thyaw, focal=focal, resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
+
+def inversion_points( x_real, y_real, z_real, camera_x, camera_y, camera_z, thpitch, throll, thyaw, focal, resolution_x, resolution_y, sensor_x, sensor_y):
+
+    return  points(x_real=x_real, y_real=z_real, z_real=y_real, camera_x=camera_x, camera_y=camera_z, camera_z=camera_y, thyaw=throll, thpitch=thpitch, throll=thyaw, focal=focal, resolution_x=resolution_x, resolution_y=resolution_y, sensor_x=sensor_x, sensor_y=sensor_y)
