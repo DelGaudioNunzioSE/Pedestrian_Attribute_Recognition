@@ -9,16 +9,19 @@ from torch.utils.data import DataLoader
 from classifier import CNNWithAttention
 from SupportScripts.DataRefactor.readDataset import CSVDataset
 from SupportScripts.adjustedLoss import *
+from SupportScripts.device import device_selecter
 
 
 
 
 class Tester:
     # INIT
-    def __init__(self, data_test, POS_WEIGHT_GENDER, POS_WEIGHT_BAG, POS_WEIGHT_HAT):
-        self.device = self.device_selection() # device selection
+    def __init__(self, data_test, batch_size, POS_WEIGHT_GENDER=1/2, POS_WEIGHT_BAG=1/2, POS_WEIGHT_HAT=1/2):
+        self.device = device_selecter() # device selection
 
         self.data_test=data_test # dataset for test
+
+        self.batch_size=batch_size
 
         self.losses_hat = [] 
         self.losses_gender = [] 
@@ -45,44 +48,28 @@ class Tester:
         self.POS_WEIGHT_HAT=POS_WEIGHT_HAT
 
 
-
-
-
-
-
-
     
-    def device_selection(self):
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        elif torch.backends.mps.is_available():
-            self.device = torch.device("mps")
-        else:
-            self.device = torch.device("cpu")
-        print(f"Using device: {self.device}") 
-
-    
-    def tpfpfn(pred,labels):
+    def tpfpfn(self, pred,labels):
         tp = ((pred == 1) & (labels.unsqueeze(1) == 1)).sum().item()
         fp = ((pred == 1) & (labels.unsqueeze(1) == 0)).sum().item()
         fn = ((pred == 0) & (labels.unsqueeze(1) == 1)).sum().item()
         return tp,fp,fn
     
-    def fscore(tp,fp,fn):
+    def fscore(self,tp,fp,fn):
         precision = tp / (tp + fp + 1e-8)
         recall_gender = tp / (tp + fn + 1e-8)
         f1 = 2 * (precision * recall_gender) / (precision + recall_gender + 1e-8)
         return f1
 
 
-    def test(self,model_path):
-        self.model = CNNWithAttention() 
-        self.model.to(self.device)
-        checkpoint = torch.load(model_path)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+    def test(self,model,gender_weight=1/3,bag_weight=1/3,hat_weight=1/3):
+        # model = CNNWithAttention() 
+        # model.to(self.device)
+        # checkpoint = torch.load(model_path)
+        # model.load_state_dict(checkpoint['model_state_dict'])
 
 
-        self.model.eval()  # Imposta il modello in modalità valutazione
+        model.eval()  # Imposta il modello in modalità valutazione
         val_loss = 0.0
         val_acc_gender = 0.0
         val_acc_hat = 0.0
@@ -103,7 +90,7 @@ class Tester:
             for i, (images, labels) in enumerate(self.data_test):
                 images = images.to(self.device)
                 labels = labels.to(self.device)
-                gender, bag, hat  = self.model(images)
+                gender, bag, hat  = model(images)
 
                 # Calcola le perdite
                 loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= self.POS_WEIGHT_GENDER)
@@ -111,7 +98,7 @@ class Tester:
                 loss_hat = adjustedLoss(bag, labels[:, 2], pos_weight= self.POS_WEIGHT_HAT)
 
                         #loss_val = gradnorm_loss(loss_gender, loss_hat, loss_bag)
-                loss_val = loss_gender + loss_hat + loss_bag
+                loss_val = total_loss_fuction(loss_gender,loss_bag,loss_hat, gender_weight,  bag_weight, hat_weight)
                         
                 val_loss += loss_val.item()
 
@@ -163,7 +150,7 @@ class Tester:
         fbag = self.fscore(tp_bag_tot, fp_bag_tot, fn_bag_tot)
 
         # Salvo i valori di validazione per ogni epoca
-        self.losses_tot.append(self.total_training_loss / len(self.data_train))
+        self.losses_tot.append(self.total_training_loss / len(self.data_test))
         self.val_losses_tot.append(val_loss)
         self.val_accuracies_gender.append(val_acc_gender)
         self.val_accuracies_hat.append(val_acc_hat)
@@ -175,7 +162,7 @@ class Tester:
         print(f"Tp (Hat): {tp_hat_tot:.4f}, Fp (Hat): {fp_hat_tot:.4f}, Fn (hat): {fn_hat_tot}")
         print(f"Tp (Bag): {tp_bag_tot:.4f}, Fp (Bag): {fp_bag_tot:.4f}, Fn (Bag): {fn_bag_tot}")
         print(f"Fscore (Gender): {fgender:.2f}, Fscore (Hat): {fhat:.2f}, Fbag (Bag): {fbag}")
-        print("Total Validation Samples: ", len(self.data_valid) * BATCH_SIZE)
+        print("Total Validation Samples: ", len(self.data_test) * self.batch_size)
 
 
     def plot(self):
@@ -242,23 +229,5 @@ class Tester:
 
 
 
-# FAKE MAIN
-#TEST_MEAN = torch.tensor([0.4582, 0.4469, 0.4290])
-#TEST_STD = torch.tensor([0.2306, 0.2173, 0.2187])
-#IMAGE_TYPE = 'RGB'
-#BATCH_SIZE = 512
 
-
-#transform = transforms.Compose([transforms.ToTensor(),
-#				                transforms.Resize((224, 224)),
-#                                ])
-
-
-#CSV_TEST_FILE='./src/Classifier/Datasets/validation_set.csv'
-#MODEL_PATH='./src/Classifier/Models/checkpoint_epoch_2_30_0546.pth'
-#data = pd.read_csv(CSV_TEST_FILE, sep=';')
-#dataset_test= CSVDataset(csv_file=data, transform=transform, train=False, mean=TEST_MEAN, std=TEST_STD, Normalize=True, ImageType=IMAGE_TYPE)
-#data_test= DataLoader(dataset_test, batch_size=BATCH_SIZE)
-#tester=Tester(MODEL_PATH)
-#tester.test(data_test)
 
