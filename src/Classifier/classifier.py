@@ -34,6 +34,7 @@ class CNNWithAttention(nn.Module):
         resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
         if(channel == 'L'): # use black and white images <---
             resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+            print('Model: black and white mode')
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
         self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
         self.proj = nn.Linear(2048, hidden_dim)

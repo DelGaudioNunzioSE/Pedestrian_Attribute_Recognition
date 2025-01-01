@@ -1,3 +1,4 @@
+from datetime import datetime
 import torch 
 import torch.nn as nn 
 import torch.optim as optim 
@@ -10,6 +11,8 @@ from torchvision import transforms
 from sklearn.model_selection import train_test_split
 from torch.optim import lr_scheduler
 from torch.utils.data import WeightedRandomSampler
+from PIL import Image, ImageOps
+from torch.optim.lr_scheduler import CyclicLR
 
 # OUR IMPORTS
 from SupportScripts.checkpoint import checkpoint_fuction
@@ -19,17 +22,21 @@ from SupportScripts.tester import Tester
 from SupportScripts.device import device_selecter
 from SupportScripts.calculateClassWeights import calculate_class_weights
 
+# auto information
 DEVICE=device_selecter()
-
+STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
+LEARNING_COMMENT ='HistogramEqualization'
+NUMBER_OF_NEURONS=int(256*2)
 DEBUG = False
 TIMESTAMP = True
 CLASS_WEIGHTS= False # Paolo's
+MODEL_PATH=None # if you wanto to start from a previous model
 
 # Nunzio's
 REORDER=False # Nunzio's reorder
-IMAGE_TYPE='L' # RGB or L balck and white
+IMAGE_TYPE='RGB' # RGB or L balck and white
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -40,33 +47,41 @@ VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.00001
 NUM_EPOCHS = 10
 GENDER_LOSS_WEIGHT = 0.2
-HAT_LOSS_WEIGHT = 0.5
-BAG_LOSS_WEIGHT = 0.3
+BAG_LOSS_WEIGHT = 0.6
+HAT_LOSS_WEIGHT = 0.2
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
 
 #########################################################################################
-
+class HistogramEqualization:
+    def __call__(self, img):
+        if not isinstance(img, Image.Image):
+            raise TypeError("Input deve essere un'immagine PIL.Image")
+        return ImageOps.equalize(img)
 
 
 
 ##### DATA AUGMENTATION ######################################
 ####################################################
 if IMAGE_TYPE=='L':
-    TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
-                                transforms.RandomHorizontalFlip(),
-                                transforms.ToTensor(),
-                                transforms.Normalize(mean=[0.5], std=[0.5])
+    TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+                                    transforms.RandomHorizontalFlip(),
+                                    HistogramEqualization(),
+                                    transforms.ToTensor(),
+                                    transforms.Resize((224, 224)),
+                                    transforms.Normalize(mean=[0.5], std=[0.5])
     ])
 else: 
-    TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
+    TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                                     transforms.RandomHorizontalFlip(),
+                                    HistogramEqualization(),
                                     transforms.ToTensor(),
-                                    transforms.Normalize([0.4582, 0.4469, 0.4290],[0.2306, 0.2173, 0.2187])
+                                    transforms.Resize((224, 224)),
+                                    transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225]) # resbet50 normalization
     ])
 
 
@@ -111,7 +126,7 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE, sampler=valid_samp
 ##### MODELLO ######################################
 ####################################################
 # Model creation
-model = CNNWithAttention(channel=IMAGE_TYPE)   
+model = CNNWithAttention(channel=IMAGE_TYPE, hidden_dim=NUMBER_OF_NEURONS)   
 model.to(DEVICE)
 
 def init_weights(m):
@@ -120,6 +135,10 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 model.apply(init_weights)
+
+if MODEL_PATH != None:
+    checkpoint = torch.load(MODEL_PATH)
+    model.load_state_dict(checkpoint['model_state_dict'])
 
 # model = models.vgg16(pretrained=True)
 # for param in model.parameters():
@@ -133,7 +152,8 @@ model.apply(init_weights)
 # Optimizer
 # Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) 
+#scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
+scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=5, mode='triangular') # Nunzio's
 ###########################################################
 
 
@@ -148,6 +168,7 @@ validator=Tester(data_valid, POS_WEIGHT_GENDER, POS_WEIGHT_BAG, POS_WEIGHT_HAT)
 for epoch in range(NUM_EPOCHS):
     
     print("We are in Epoch number: ", epoch)
+    print(f'Learning rate: {scheduler.get_last_lr()[0]}')
     total_training_loss = 0 # Loss reset for evry epoch
     model.train() # Training mode ENABLED
 
@@ -178,19 +199,16 @@ for epoch in range(NUM_EPOCHS):
                 print( 'la loss hat è:', loss_hat.item(), 'labels:',    labels[:,2])	
         print(f'Loss for {i}° batch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
-    # adaptive learning rate
-    # LEARNING_RATE=LEARNING_RATE*(epoch+1)
-
 
     print('Saving model and optimizer...')
-    plots_name=checkpoint_fuction(TIMESTAMP, model, optimizer, epoch)
+    checkpoint_fuction(TIMESTAMP, model, optimizer, epoch,channel=IMAGE_TYPE,comment=LEARNING_COMMENT)
 
     scheduler.step()
 
     # Validation
     if (VALIDATION == True):
         validator.test(model,GENDER_LOSS_WEIGHT, BAG_LOSS_WEIGHT,HAT_LOSS_WEIGHT)
-        validator.plot(plots_name)
+        validator.plot(LEARNING_COMMENT + STARTING_TRAIN_TIME_STAMP)
 
 
 
