@@ -169,7 +169,12 @@ class Tester:
 
 
 
-    def plot(self, plots_name='test'):
+
+    def plot(self, plots_name=None):
+
+        if plots_name is None:
+            plots_name = 'try'
+
         plt.figure(figsize=(8, 6))
         plt.plot(range(1, len(self.val_losses_tot) + 1), self.val_losses_tot, label='Validation Loss', marker='o')
         plt.xlabel('Epochs')

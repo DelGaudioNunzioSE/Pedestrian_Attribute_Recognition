@@ -32,6 +32,7 @@ class CSVDataset(Dataset):
             img_path = self.TRAIN_IMAGES_PATH + img_path
         else:
             img_path = self.VALIDATION_IMAGES_PATH + img_path
+
         image = Image.open(img_path).convert(self.image_type)
 
         # Apply transformations

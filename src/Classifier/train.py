@@ -27,8 +27,8 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT ='HistogramEqualization_512_neurons'
-NUMBER_OF_NEURONS=int(256*2)
+LEARNING_COMMENT = 'NOhistogram_and_512_neurons'
+NUMBER_OF_NEURONS=int(512)
 DEBUG = False
 TIMESTAMP = True
 CLASS_WEIGHTS= False # Paolo's
@@ -47,8 +47,8 @@ VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
-LEARNING_RATE = 0.00001
-NUM_EPOCHS = 15
+LEARNING_RATE = 0.00002
+NUM_EPOCHS = 10
 GENDER_LOSS_WEIGHT = 0.2
 BAG_LOSS_WEIGHT = 0.6
 HAT_LOSS_WEIGHT = 0.2
@@ -70,7 +70,7 @@ class HistogramEqualization:
 if IMAGE_TYPE=='L':
     TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                                     transforms.RandomHorizontalFlip(),
-                                    HistogramEqualization(),
+                                    # HistogramEqualization(),
                                     transforms.ToTensor(),
                                     transforms.Resize((224, 224)),
                                     transforms.Normalize(mean=[0.5], std=[0.5])
@@ -78,7 +78,7 @@ if IMAGE_TYPE=='L':
 else: 
     TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                                     transforms.RandomHorizontalFlip(),
-                                    HistogramEqualization(),
+                                    # HistogramEqualization(),
                                     transforms.ToTensor(),
                                     transforms.Resize((224, 224)),
                                     transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225]) # resbet50 normalization
@@ -208,7 +208,7 @@ for epoch in range(NUM_EPOCHS):
     # Validation
     if (VALIDATION == True):
         validator.test(model,GENDER_LOSS_WEIGHT, BAG_LOSS_WEIGHT,HAT_LOSS_WEIGHT)
-        validator.plot(LEARNING_COMMENT + STARTING_TRAIN_TIME_STAMP)
+        validator.plot(LEARNING_COMMENT)
 
 
 
