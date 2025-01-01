@@ -27,7 +27,7 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT ='HistogramEqualization'
+LEARNING_COMMENT ='HistogramEqualization_512_neurons'
 NUMBER_OF_NEURONS=int(256*2)
 DEBUG = False
 TIMESTAMP = True
@@ -48,7 +48,7 @@ VALIDATION = True # if we have to compute validaton too
 BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.00001
-NUM_EPOCHS = 10
+NUM_EPOCHS = 15
 GENDER_LOSS_WEIGHT = 0.2
 BAG_LOSS_WEIGHT = 0.6
 HAT_LOSS_WEIGHT = 0.2
@@ -201,7 +201,7 @@ for epoch in range(NUM_EPOCHS):
 
 
     print('Saving model and optimizer...')
-    checkpoint_fuction(TIMESTAMP, model, optimizer, epoch,channel=IMAGE_TYPE,comment=LEARNING_COMMENT)
+    checkpoint_fuction(TIMESTAMP, model, optimizer, epoch,comment=LEARNING_COMMENT)
 
     scheduler.step()
 
