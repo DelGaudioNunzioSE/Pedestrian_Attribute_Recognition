@@ -92,8 +92,8 @@ class Tester:
 
                 # Calcola le perdite
                 loss_gender = adjustedLoss(gender, labels[:, 0], pos_weight= self.POS_WEIGHT_GENDER)
-                loss_bag = adjustedLoss(bag, labels[:, 1], pos_weight= self.POS_WEIGHT_HAT)
-                loss_hat = adjustedLoss(hat, labels[:, 2], pos_weight= self.POS_WEIGHT_BAG)
+                loss_bag = adjustedLoss(bag, labels[:, 1], pos_weight= self.POS_WEIGHT_BAG)
+                loss_hat = adjustedLoss(hat, labels[:, 2], pos_weight= self.POS_WEIGHT_HAT)
 
                         #loss_val = gradnorm_loss(loss_gender, loss_hat, loss_bag)
                 loss_val = total_loss_fuction(loss_gender,loss_bag,loss_hat, gender_weight,  bag_weight, hat_weight)
