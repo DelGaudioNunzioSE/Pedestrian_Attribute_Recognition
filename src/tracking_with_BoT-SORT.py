@@ -23,8 +23,8 @@ data = {
 }
 
 #Dall'immagine del bounding box all'input della rete
-transform = transforms.Compose([transforms.ToTensor(),
-				transforms.Resize((224, 224))])
+transform= transforms.Compose([transforms.Resize(224), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+
 
 # Funzione per calcolare l'orientamento (cross product) di tre punti
 def orientation(p, q, r):
@@ -102,6 +102,7 @@ def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
+    cropped_img = Image.fromarray(cropped_img)
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
     cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
@@ -121,6 +122,8 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention()   
+    checkpoint = torch.load('./src/Classifier/Models/checkpoint_9_31_1925.pth')
+    classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
 
@@ -128,7 +131,7 @@ def my_track(video_path, tracker, show=False):
     print(f"The model is loaded on: {next(model.parameters()).device}")
 
     # Run tracking with the specified tracker configuration file
-    results = model.track(source=video_path, show=False, tracker=tracker, stream=True, classes=0, imgsz = (1920,1080), vid_stride=10
+    results = model.track(source=video_path, show=False, tracker=tracker, stream=True, classes=0, imgsz = (1920,1080), vid_stride=15
                           ,iou = 0.9) #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
     
     image=next(results)
@@ -150,9 +153,9 @@ def my_track(video_path, tracker, show=False):
             
             # Classificazioni (gender, hat, bag)
             gender, hat, bag = classifier_model(img)
-            gender_pred = torch.sigmoid(gender) < 0.5
-            hat_pred = torch.sigmoid(hat) < 0.5
-            bag_pred = torch.sigmoid(bag) < 0.5
+            gender_pred = torch.sigmoid(gender) > 0.5
+            hat_pred = torch.sigmoid(hat) > 0.5
+            bag_pred = torch.sigmoid(bag) > 0.5
             # Disegna il bounding box sul frame
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             
