@@ -223,7 +223,7 @@ def my_track(video_path, tracker, show=False):
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
                           stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
-                          ,iou = 0.7, max_det=30, persist=True, half=True)
+                          ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
     #1920x1080 riesce a prendersi il ragazzo dietro
