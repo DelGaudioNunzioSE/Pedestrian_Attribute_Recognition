@@ -24,13 +24,34 @@ data = {
     "trajectory":[]
 }
 
+probs = {"people": {}
+}
+
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
             raise TypeError("Input deve essere un'immagine PIL.Image")
         return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
-transform= transforms.Compose([transforms.Resize((224, 224)), HistogramEqualization(), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    
+class CLAHE:
+    def __init__(self):
+        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    
+    def __call__(self, img):
+        img = np.array(img)
+        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img_clahe = self.clahe.apply(img_gray)
+        img_rgb = cv2.cvtColor(img_clahe, cv2.COLOR_GRAY2RGB)
+        return Image.fromarray(img_rgb)
+
+transform = transforms.Compose([
+    CLAHE(),
+    transforms.ToTensor(),
+    transforms.Resize((224, 224)),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
 
 
 # Funzione per calcolare l'orientamento (cross product) di tre punti
@@ -63,6 +84,33 @@ def do_intersect(p1, q1, p2, q2):
         return True
     
     return False
+
+
+    
+def has_gender_peak(probabilities, threshold=0.6, window_size=20):
+    # Considera solo le ultime N predizioni
+    recent_probs = probabilities[-window_size:]
+    # Calcola la media delle probabilità recenti
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    # Se la media supera la soglia, restituisce True (c'è lo zaino)
+    return avg_prob > threshold
+
+def has_bag_peak(probabilities, threshold=0.4, window_size=20, peak_threshold=0.8):
+    recent_probs = probabilities[-window_size:]
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    max_prob = max(recent_probs)
+
+    return avg_prob > threshold or max_prob > peak_threshold
+
+    
+def has_hat_peak(probabilities, threshold=0.4, window_size=10):
+    # Considera solo le ultime N predizioni
+    recent_probs = probabilities[-window_size:]
+    # Calcola la media delle probabilità recenti
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    # Se la media supera la soglia, restituisce True (c'è lo zaino)
+    return avg_prob > threshold
+
 
 
 def getPoints(frame):
@@ -105,6 +153,22 @@ def drawLine(frame,p1,p2,orientation):
     cv2.arrowedLine(frame, center, third_point, color=(255, 0, 0), thickness=2)
     
     return frame
+
+def histo(img_rgb):
+        r, g, b = cv2.split(img_rgb)
+
+        # Equalizzazione dell'istogramma per ciascun canale
+        r_equalized = cv2.equalizeHist(r)
+        g_equalized = cv2.equalizeHist(g)
+        b_equalized = cv2.equalizeHist(b)
+
+        # Ricompone l'immagine a colori con i canali equalizzati
+        img_equalized = cv2.merge([r_equalized, g_equalized, b_equalized])
+
+        # Converti l'immagine back a BGR per il salvataggio
+        img_equalized_bgr = cv2.cvtColor(img_equalized, cv2.COLOR_RGB2BGR)
+
+        return img_equalized_bgr
 
 def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
@@ -177,9 +241,9 @@ def my_track(video_path, tracker, show=False):
 
                     # Classificazioni (gender, hat, bag)
                     gender, bag, hat = classifier_model(img)
-                    gender_pred = torch.sigmoid(gender) > 0.5 #0.4
-                    hat_pred = torch.sigmoid(hat) > 0.5
-                    bag_pred = torch.sigmoid(bag) > 0.2 #0.3
+                    gender_pred = torch.sigmoid(gender)  #0.4
+                    hat_pred = torch.sigmoid(hat)  
+                    bag_pred = torch.sigmoid(bag) #0.3
                     # Disegna il bounding box sul frame
 
                     box_x, box_y, box_width, box_height = 10, 10, 250, 100  
@@ -200,9 +264,9 @@ def my_track(video_path, tracker, show=False):
                     
                     new_person = {
                         "id": id.item(),
-                        "gender": "Female" if gender_pred else "Male",
-                        "hat": "Yes" if hat_pred else "No",
-                        "bag": "Yes" if bag_pred else "No",
+                        "gender": gender_pred.item(),
+                        "hat": hat_pred.item(),
+                        "bag": bag_pred.item(),
                         "trajectory": [trajectory]
                     }
                     if new_person["id"] in data["people"]:
@@ -211,6 +275,21 @@ def my_track(video_path, tracker, show=False):
                         person["gender"] = new_person["gender"]
                         person["hat"] = new_person["hat"]
                         person["bag"] = new_person["bag"]
+
+                        prs = probs["people"][new_person["id"]]
+                        prs["gender_pred"].append(new_person["gender"])
+                        prs["bag_pred"].append(new_person["bag"])
+                        prs["hat_pred"].append(new_person["hat"])
+
+                        bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
+                        person["bag"] = bag_pred
+
+                        gender_pred = "Female" if has_gender_peak(prs["gender_pred"]) else "Male"
+                        person["gender"] = gender_pred
+
+                        hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
+                        person["hat"] = hat_pred
+                        
                         # Aggiungi la nuova traiettoria
                         if(person["trajectory"][-1]!=trajectory):
                             person["trajectory"].append(trajectory)
@@ -230,6 +309,21 @@ def my_track(video_path, tracker, show=False):
                         trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
                     else:
                         data["people"][new_person["id"]] = new_person
+
+                        pr = {"id": id.item(), "gender_pred": [], "bag_pred": [], "hat_pred": []}
+                        probs["people"][new_person["id"]] = pr
+                        prs = probs["people"][new_person["id"]]
+                        prs["gender_pred"].append(new_person["gender"])
+                        prs["bag_pred"].append(new_person["bag"])
+                        prs["hat_pred"].append(new_person["hat"])
+
+                        bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
+                        gender_pred = "Female" if has_gender_peak(prs["gender_pred"]) else "Male"
+                        hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
+                        
+
+
+
                         id_text=f"{int(new_person['id'])}"
                         gender_text = f"Gender: {new_person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if new_person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if new_person['bag'] == 'Yes' else 'No'}"
@@ -253,7 +347,8 @@ def my_track(video_path, tracker, show=False):
 
 
 
-video_path = './src/Tracking/videos/Atrio_bright.mp4' # Path to the input video file (`video_fish.mp4`)
+
+video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
@@ -263,6 +358,11 @@ my_track(video_path, tracker, show)
 file_path = './src/Tracking/videos/data.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(data, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
+    print(f"File salvato in {file_path}")
+
+file_path = './src/Tracking/videos/probs.json'
+with open(file_path, 'w', encoding='utf-8') as file:
+    json.dump(probs, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
 
 
