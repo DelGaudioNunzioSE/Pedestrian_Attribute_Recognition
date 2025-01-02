@@ -5,5 +5,7 @@ src/Classifier/Datasets/
 !src/Classifier/Datasets/training_set.csv
 !src/Classifier/Datasets/validation_set.csv
 src/Classifier/Models/*
+src/Tracking/videos/
+*.mp4
 *.png
 *.jpg
