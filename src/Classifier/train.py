@@ -30,7 +30,7 @@ STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 LEARNING_COMMENT = 'NOhistogram_and_512_neurons'
 NUMBER_OF_NEURONS=int(512)
 DEBUG = False
-TIMESTAMP = True
+TIMESTAMP = False
 CLASS_WEIGHTS= False # Paolo's
 MODEL_PATH=None # if you wanto to start from a previous model
 
@@ -45,10 +45,10 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
-VALIDATION_SIZE = 0.1
-LEARNING_RATE = 0.00002
-NUM_EPOCHS = 10
+BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
+VALIDATION_SIZE = 0.2
+LEARNING_RATE = 0.0001 #buone prestazioni con 0.0001
+NUM_EPOCHS = 5
 GENDER_LOSS_WEIGHT = 0.2
 BAG_LOSS_WEIGHT = 0.6
 HAT_LOSS_WEIGHT = 0.2
@@ -91,13 +91,13 @@ else:
 ##### DATASET ######################################
 ####################################################
 
-rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
-DATASET_SIZE=rcsv.erase_invalid_row()
-CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
+# rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
+# DATASET_SIZE=rcsv.erase_invalid_row()
+# CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
 
 
 # Reading new dataset
-data = pd.read_csv(CSV_TRAINING_FILE, sep=';')
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';',nrows=10000)
 train_data, val_data = train_test_split(data, test_size=VALIDATION_SIZE, random_state=42)
 
 dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE)
@@ -107,7 +107,6 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, 
 
 
 # Change class weight
-print('Starting evaluating weights...')
 if CLASS_WEIGHTS == True:
     class_weights = calculate_class_weights(dataset_train)
     sampler = WeightedRandomSampler(class_weights, len(dataset_train))
@@ -165,6 +164,7 @@ validator=Tester(data_valid, POS_WEIGHT_GENDER, POS_WEIGHT_BAG, POS_WEIGHT_HAT)
 
 
 # TRAINING LOOP  ##########################################
+
 for epoch in range(NUM_EPOCHS):
     
     print("We are in Epoch number: ", epoch)
@@ -180,9 +180,8 @@ for epoch in range(NUM_EPOCHS):
 
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
         loss_bag = adjustedLoss(bag, labels[:,1],pos_weight=POS_WEIGHT_BAG)
-        loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_HAT) #unsqueeze ha fatto 32x1
-        loss = total_loss_fuction(loss_gender=loss_gender, loss_bag=loss_bag, loss_hat=loss_hat, gender_weight = GENDER_LOSS_WEIGHT, bag_weight=BAG_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT)
-        #loss = gradnorm_loss(loss_gender, loss_hat, loss_bag)
+        loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_HAT)
+        loss = loss_gender + loss_bag + loss_hat
 
 
         # Backward pass and optimization
@@ -209,6 +208,7 @@ for epoch in range(NUM_EPOCHS):
     if (VALIDATION == True):
         validator.test(model,GENDER_LOSS_WEIGHT, BAG_LOSS_WEIGHT,HAT_LOSS_WEIGHT)
         validator.plot(LEARNING_COMMENT)
+
 
 
 

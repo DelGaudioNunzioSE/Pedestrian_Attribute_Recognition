@@ -45,6 +45,7 @@ class CNNWithAttention(nn.Module):
         self.attention1 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
         self.attention2 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
         self.attention3 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
+
         
         # Fully Connected Layer
         self.fc1 = nn.Linear(hidden_dim, hidden_dim // 2)

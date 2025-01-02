@@ -9,6 +9,7 @@ from SupportScripts.device import device_selecter
 
 
 
+
 class Tester:
     # INIT
     def __init__(self, data_test, batch_size, POS_WEIGHT_GENDER=1/2, POS_WEIGHT_BAG=1/2, POS_WEIGHT_HAT=1/2):
@@ -60,7 +61,7 @@ class Tester:
         return f1
 
 
-    def test(self,model,gender_weight=1/3,bag_weight=1/3,hat_weight=1/3):
+    def test(self,model,gender_weight=1,bag_weight=1,hat_weight=1,t=0.5):
         # model = CNNWithAttention() 
         # model.to(self.device)
         # checkpoint = torch.load(model_path)
@@ -95,23 +96,22 @@ class Tester:
                 loss_bag = adjustedLoss(bag, labels[:, 1], pos_weight= self.POS_WEIGHT_BAG)
                 loss_hat = adjustedLoss(hat, labels[:, 2], pos_weight= self.POS_WEIGHT_HAT)
 
-                        #loss_val = gradnorm_loss(loss_gender, loss_hat, loss_bag)
-                loss_val = total_loss_fuction(loss_gender,loss_bag,loss_hat, gender_weight,  bag_weight, hat_weight)
+                loss_val = loss_gender + loss_bag + loss_hat
                         
                 val_loss += loss_val.item()
 
-                        #Calcola l'accuratezza per ciascun output
-                gender_pred = torch.sigmoid(gender) > 0.5
+                #Calcola l'accuratezza per ciascun output
+                gender_pred = torch.sigmoid(gender) > t
                 accuracy_gender = (gender_pred.float() == labels[:, 0].unsqueeze(1)).float().mean()
                 tp_gender, fp_gender, fn_gender = self.tpfpfn(gender_pred,labels[:,0])
                 fgender = self.fscore(tp_gender, fp_gender, fn_gender)
 
-                bag_pred = torch.sigmoid(bag) > 0.5
+                bag_pred = torch.sigmoid(bag) > t
                 accuracy_bag = (bag_pred.float() == labels[:, 1].unsqueeze(1)).float().mean()
                 tp_bag, fp_bag, fn_bag = self.tpfpfn(bag_pred,labels[:,1])
                 fbag = self.fscore(tp_bag, fp_bag, fn_bag)
 
-                hat_pred = torch.sigmoid(hat) > 0.5
+                hat_pred = torch.sigmoid(hat) > t
                 accuracy_hat = (hat_pred.float() == labels[:, 2].unsqueeze(1)).float().mean()
                 tp_hat, fp_hat, fn_hat = self.tpfpfn(hat_pred,labels[:,2])
                 fhat = self.fscore(tp_hat, fp_hat, fn_hat)
@@ -134,7 +134,6 @@ class Tester:
                 fn_bag_tot += fn_bag
 
                 total_samples += 1
-                print(f"Validation batch {i+1}/{len(self.data_test)}")
 
         # Calcola le medie
         val_loss /= total_samples
@@ -165,6 +164,7 @@ class Tester:
         print(f"Tp (Hat): {tp_hat_tot:.4f}, Fp (Hat): {fp_hat_tot:.4f}, Fn (hat): {fn_hat_tot}")
         print(f"Tp (Bag): {tp_bag_tot:.4f}, Fp (Bag): {fp_bag_tot:.4f}, Fn (Bag): {fn_bag_tot}")
         print(f"Fscore (Gender): {fgender:.2f}, Fscore (Hat): {fhat:.2f}, Fbag (Bag): {fbag}")
+        print("Threshold: ",t)
         print("Total Validation Samples: ", len(self.data_test) * self.batch_size)
 
 

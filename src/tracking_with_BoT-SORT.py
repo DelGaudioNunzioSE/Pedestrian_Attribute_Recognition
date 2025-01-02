@@ -6,8 +6,10 @@ import os
 import json
 from torchvision import transforms
 from Classifier.classifier import CNNWithAttention
-from PIL import Image
+from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
+
+
 
 
 
@@ -22,8 +24,13 @@ data = {
     "trajectory":[]
 }
 
+class HistogramEqualization:
+    def __call__(self, img):
+        if not isinstance(img, Image.Image):
+            raise TypeError("Input deve essere un'immagine PIL.Image")
+        return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
-transform= transforms.Compose([transforms.Resize(224), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+transform= transforms.Compose([transforms.Resize((224, 224)), HistogramEqualization(), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
 
 # Funzione per calcolare l'orientamento (cross product) di tre punti
@@ -98,11 +105,12 @@ def drawLine(frame,p1,p2,orientation):
     cv2.arrowedLine(frame, center, third_point, color=(255, 0, 0), thickness=2)
     
     return frame
+
 def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
-    cropped_img = Image.fromarray(cropped_img)
+    cropped_img = Image.fromarray(cropped_img).convert('RGB')
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
     cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
@@ -121,8 +129,8 @@ def my_track(video_path, tracker, show=False):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention()   
-    checkpoint = torch.load('./src/Classifier/Models/checkpoint_9_31_1925.pth')
+    classifier_model = CNNWithAttention(hidden_dim=512)   
+    checkpoint = torch.load('./src/Classifier/Models/HistogramEqualization_512_neurons_7_01_0818.pth')
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
@@ -131,71 +139,114 @@ def my_track(video_path, tracker, show=False):
     print(f"The model is loaded on: {next(model.parameters()).device}")
 
     # Run tracking with the specified tracker configuration file
-    results = model.track(source=video_path, show=False, tracker=tracker, stream=True, classes=0, imgsz = (1920,1080), vid_stride=15
-                          ,iou = 0.9) #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
+    results = model.track(source=video_path, show=False, tracker=tracker, 
+                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
+                          ,iou = 0.7, max_det=30, persist=True, half=True)
     
+    #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
+    #1920x1080 riesce a prendersi il ragazzo dietro
+    #ma forse possiamo usare 1280x720 e recuperarlo col detector
+    #half migliora la velocità anche se abbassa un pò l'accuracy
+
+
+    # Prendo image prima solo per disegnare le linee
     image=next(results)
     frame=image.orig_img
     points=getPoints(frame)
-    for result in results:
-        frame = result.orig_img  # Immagine originale del frame
-        trajectory=0
-        orientation=True
-        for i,point in enumerate(points):
-           if(i%2==1):
-            frame=drawLine(frame,point,point_temp,orientation)
-            orientation=False
-           point_temp=point
-        # Itera su ogni bounding box e ID
-        for box, id in zip(result.boxes.xyxy, result.boxes.id):
-            x1, y1, x2, y2 = map(int, box)  # Bounding box coordinates
-            img = drawBox(box, frame,device)  # Prepara input per la rete di classificazione
-            
-            # Classificazioni (gender, hat, bag)
-            gender, hat, bag = classifier_model(img)
-            gender_pred = torch.sigmoid(gender) > 0.5
-            hat_pred = torch.sigmoid(hat) > 0.5
-            bag_pred = torch.sigmoid(bag) > 0.5
-            # Disegna il bounding box sul frame
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            
-            if(do_intersect((x1,y1),(x2,y2),points[0],points[1])):
-                trajectory=1
-            if(do_intersect((x1,y1),(x2,y2),points[2],points[3])):
-                trajectory=1
-                    
-            # Crea un dizionario con le informazioni
-            
-            new_person = {
-                "id": id.item(),
-                "gender": "Female" if gender_pred else "Male",
-                "hat": "Yes" if hat_pred else "No",
-                "bag": "Yes" if bag_pred else "No",
-                "trajectory": [trajectory]
-            }
-            if new_person["id"] in data["people"]:
-                # Aggiorna la persona esistente
-                person = data["people"][new_person["id"]]
-                person["gender"] = new_person["gender"]
-                person["hat"] = new_person["hat"]
-                person["bag"] = new_person["bag"]
-                # Aggiungi la nuova traiettoria
-                if(person["trajectory"][-1]!=trajectory):
-                    person["trajectory"].append(trajectory)
-                text = f"ID: {person["id"]} | G: {person['gender']} | Hat: {person['hat']} | Bag: {person['bag'] }| trajectory:{person['trajectory']}"
-                 # Posiziona il testo sopra il bounding box
-                cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            else:
-                # Aggiungi una nuova persona
-                data["people"][new_person["id"]] = new_person
-                text = f"ID: {new_person['id']} | G: {new_person['gender']} | Hat: {new_person['hat']} | Bag: {new_person['bag'] }| trajectory:{new_person['trajectory']}"
-                # Posiziona il testo sopra il bounding box
-                cv2.putText(frame, text, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+    extra_width = 30  
+    line_height = 20
+
+    for i,result in enumerate(results):
+        if i%2 == 0:
+            frame = result.orig_img.copy()
+            frame_original = result.orig_img  # Immagine originale del frame
             trajectory=0
-        # Mostra il frame con i risultati
-        cv2.imshow("Tracking", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            orientation=True
+            for i,point in enumerate(points):
+                if(i%2==1):
+                    frame=drawLine(frame,point,point_temp,orientation)
+                    orientation=False
+                point_temp=point
+            # Itera su ogni bounding box e ID
+            if result.boxes.xyxy is not None and result.boxes.id is not None:
+                for box, id in zip(result.boxes.xyxy, result.boxes.id):
+                    x1, y1, x2, y2 = map(int, box)  # Bounding box coordinates
+                    img = drawBox(box, frame_original,device)  # Prepara input per la rete di classificazione
+                    x1_extended = x1 - extra_width  # Aggiungi margine a sinistra
+                    x2_extended = x2 + extra_width  # Aggiungi margine a destra
+
+                    # Classificazioni (gender, hat, bag)
+                    gender, bag, hat = classifier_model(img)
+                    gender_pred = torch.sigmoid(gender) > 0.5 #0.4
+                    hat_pred = torch.sigmoid(hat) > 0.5
+                    bag_pred = torch.sigmoid(bag) > 0.5 #0.3
+                    # Disegna il bounding box sul frame
+
+                    box_x, box_y, box_width, box_height = 10, 10, 250, 100  
+                    cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1)
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2) # qua disegna i bounding_box
+                    cv2.rectangle(frame,(x1,y1),(x1+20,y1+20),(255,255,255),-1)
+                    text_box_height = 70
+                    x1_extended = max(x1_extended, 0)
+                    x2_extended = min(x2_extended, frame.shape[1])
+                    cv2.rectangle(frame, (x1_extended, y2), (x2_extended, y2 + text_box_height), (255, 255, 255), -1)  # Box bianco
+
+                    if(do_intersect((x1,y1),(x2,y2),points[0],points[1])):
+                        trajectory=1
+                    if(do_intersect((x1,y1),(x2,y2),points[2],points[3])):
+                        trajectory=1
+                            
+                    # Crea un dizionario con le informazioni
+                    
+                    new_person = {
+                        "id": id.item(),
+                        "gender": "Female" if gender_pred else "Male",
+                        "hat": "Yes" if hat_pred else "No",
+                        "bag": "Yes" if bag_pred else "No",
+                        "trajectory": [trajectory]
+                    }
+                    if new_person["id"] in data["people"]:
+                        # Aggiorna la persona esistente
+                        person = data["people"][new_person["id"]]
+                        person["gender"] = new_person["gender"]
+                        person["hat"] = new_person["hat"]
+                        person["bag"] = new_person["bag"]
+                        # Aggiungi la nuova traiettoria
+                        if(person["trajectory"][-1]!=trajectory):
+                            person["trajectory"].append(trajectory)
+                        id_text=f"{int(person['id'])}"
+                        gender_text = f"Gender: {person['gender']}"
+                        hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
+                        trajectory_text = f"Trajectory: {person['trajectory'] }"
+                        cv2.putText(frame,id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
+                        cv2.putText(frame, gender_text, (x1_extended, y2 + line_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        total_people= len(data["people"])
+                        cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                        cv2.putText(frame, f"Trajectory 1: {trajectory_1}", (box_x + 10, box_y + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                        cv2.putText(frame, f"Trajectory 2: {trajectory_2}", (box_x + 10, box_y + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                        trajectory_1 = sum(1 for person in data["people"].values() if 1 in person["trajectory"])
+                        trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
+                    else:
+                        data["people"][new_person["id"]] = new_person
+                        id_text=f"{int(new_person['id'])}"
+                        gender_text = f"Gender: {new_person['gender']}"
+                        hat_bag_text = f"Hat: {'Yes' if new_person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if new_person['bag'] == 'Yes' else 'No'}"
+                        trajectory_text = f"Trajectory: {new_person['trajectory']}"    
+                        cv2.putText(frame,id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
+                        cv2.putText(frame, gender_text, (x1_extended, y2 + line_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                        total_people= len(data["people"])
+                        cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                        trajectory_1 = sum(1 for person in data["people"].values() if 1 in person["trajectory"])
+                        trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
+                    trajectory=0
+            # Mostra il frame con i risultati
+            cv2.imshow("Tracking", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
     cv2.destroyAllWindows()
 
