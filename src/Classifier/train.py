@@ -46,7 +46,6 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-<<<<<<< HEAD
 BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.00001
@@ -54,15 +53,6 @@ NUM_EPOCHS = 10
 GENDER_LOSS_WEIGHT = 0.25
 BAG_LOSS_WEIGHT = 0.5
 HAT_LOSS_WEIGHT = 0.25
-=======
-BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
-VALIDATION_SIZE = 0.2
-LEARNING_RATE = 0.0001 #buone prestazioni con 0.0001
-NUM_EPOCHS = 5
-GENDER_LOSS_WEIGHT = 0.2
-BAG_LOSS_WEIGHT = 0.6
-HAT_LOSS_WEIGHT = 0.2
->>>>>>> 69811fee5974667f3d6efed79c5f505ce0a42bb2
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 

@@ -141,7 +141,7 @@ def my_track(video_path, tracker, show=False):
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
                           stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
-                          ,iou = 0.7, max_det=30, persist=True, half=True)
+                          ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
     #1920x1080 riesce a prendersi il ragazzo dietro
@@ -179,7 +179,7 @@ def my_track(video_path, tracker, show=False):
                     gender, bag, hat = classifier_model(img)
                     gender_pred = torch.sigmoid(gender) > 0.5 #0.4
                     hat_pred = torch.sigmoid(hat) > 0.5
-                    bag_pred = torch.sigmoid(bag) > 0.5 #0.3
+                    bag_pred = torch.sigmoid(bag) > 0.2 #0.3
                     # Disegna il bounding box sul frame
 
                     box_x, box_y, box_width, box_height = 10, 10, 250, 100  
@@ -253,7 +253,7 @@ def my_track(video_path, tracker, show=False):
 
 
 
-video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/Atrio_bright.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
