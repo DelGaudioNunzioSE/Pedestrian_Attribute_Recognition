@@ -1,9 +1,11 @@
 __pycache__/
+src/Tracking/videos/
 src/Classifier/Datasets/validation_set/*
 src/Classifier/Datasets/training_set/*
 src/Classifier/Datasets/
 !src/Classifier/Datasets/training_set.csv
 !src/Classifier/Datasets/validation_set.csv
 src/Classifier/Models/*
+*.mp4
 *.png
 *.jpg
