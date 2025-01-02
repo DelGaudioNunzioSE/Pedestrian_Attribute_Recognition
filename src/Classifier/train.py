@@ -27,8 +27,8 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = 'NOhistogram_and_512_neurons'
-NUMBER_OF_NEURONS=int(512)
+LEARNING_COMMENT = '_canny_'
+NUMBER_OF_NEURONS=int(512/2)
 DEBUG = False
 TIMESTAMP = False
 CLASS_WEIGHTS= False # Paolo's
@@ -36,7 +36,8 @@ MODEL_PATH=None # if you wanto to start from a previous model
 
 # Nunzio's
 REORDER=False # Nunzio's reorder
-IMAGE_TYPE='RGB' # RGB or L balck and white
+IMAGE_TYPE='L' # RGB or L balck and white
+HOMEMADE_IMGE_PATH = './src/Classifier/Datasets/canny_training_set/'
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -45,6 +46,15 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
+<<<<<<< HEAD
+BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
+VALIDATION_SIZE = 0.1
+LEARNING_RATE = 0.00001
+NUM_EPOCHS = 10
+GENDER_LOSS_WEIGHT = 0.25
+BAG_LOSS_WEIGHT = 0.5
+HAT_LOSS_WEIGHT = 0.25
+=======
 BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.2
 LEARNING_RATE = 0.0001 #buone prestazioni con 0.0001
@@ -52,6 +62,7 @@ NUM_EPOCHS = 5
 GENDER_LOSS_WEIGHT = 0.2
 BAG_LOSS_WEIGHT = 0.6
 HAT_LOSS_WEIGHT = 0.2
+>>>>>>> 69811fee5974667f3d6efed79c5f505ce0a42bb2
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
@@ -68,15 +79,15 @@ class HistogramEqualization:
 ##### DATA AUGMENTATION ######################################
 ####################################################
 if IMAGE_TYPE=='L':
-    TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    TRANSFORMS = transforms.Compose([#transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                                     transforms.RandomHorizontalFlip(),
                                     # HistogramEqualization(),
                                     transforms.ToTensor(),
-                                    transforms.Resize((224, 224)),
-                                    transforms.Normalize(mean=[0.5], std=[0.5])
+                                    transforms.Resize((224, 224))
+                                    #transforms.Normalize(mean=[0.5], std=[0.5])
     ])
 else: 
-    TRANSFORMS = transforms.Compose([transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    TRANSFORMS = transforms.Compose([#transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
                                     transforms.RandomHorizontalFlip(),
                                     # HistogramEqualization(),
                                     transforms.ToTensor(),
@@ -100,8 +111,8 @@ else:
 data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';',nrows=10000)
 train_data, val_data = train_test_split(data, test_size=VALIDATION_SIZE, random_state=42)
 
-dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE)
-dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE)
+dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
+dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
 
 
 
