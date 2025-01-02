@@ -5,7 +5,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 
 class CSVDataset(Dataset):
-    def __init__(self, csv_file, train, transform=None,ImageType='RGB'):
+    def __init__(self, csv_file, train, transform=None,ImageType='RGB',homade_path=None):
 
         self.image_type=ImageType
         
@@ -13,7 +13,11 @@ class CSVDataset(Dataset):
         self.transform = transform #se vuoi fare augmentation
         self.train = train
 
-        self.TRAIN_IMAGES_PATH = "./src/Classifier/Datasets/training_set/"
+        if homade_path == None:
+            self.TRAIN_IMAGES_PATH = "./src/Classifier/Datasets/training_set/"
+        else:
+            self.TRAIN_IMAGES_PATH = homade_path
+            
         self.VALIDATION_IMAGES_PATH = "./src/Classifier/Datasets/validation_set/"
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

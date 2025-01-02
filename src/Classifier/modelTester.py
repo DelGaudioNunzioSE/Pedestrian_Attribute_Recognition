@@ -14,8 +14,9 @@ from SupportScripts.device import device_selecter
 from SupportScripts.tester import Tester
 
 ## Parametri
-MODEL= 'checkpoint_3_31_0742'
-IMAGE_TYPE = 'RGB'
+HOMEMADE_PATH = './src/Classifier/Datasets/canny_validation_set/'
+MODEL= '_canny__6_02_0704'
+IMAGE_TYPE = 'L'
 BATCH_SIZE = int(512/2)
 Number_of_neurons = int(512/2)
 #############################
@@ -28,7 +29,7 @@ class HistogramEqualization:
 
 
 if IMAGE_TYPE == 'RGB':
-    transform = transforms.Compose([#HistogramEqualization(),
+    transform = transforms.Compose([HistogramEqualization(),
                                     transforms.ToTensor(),
                                     transforms.Resize((224, 224)),
                                     transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
@@ -37,7 +38,7 @@ else:
     transform = transforms.Compose([#HistogramEqualization(),
                                     transforms.ToTensor(),
                                     transforms.Resize((224, 224)),
-                                    transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
+                                    #transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
                                 ])
 
 
@@ -45,7 +46,7 @@ else:
 CSV_TEST_FILE='./src/Classifier/Datasets/validation_set.csv'
 MODEL_PATH='./src/Classifier/Models/'+ MODEL +'.pth'
 data = pd.read_csv(CSV_TEST_FILE, sep=';')
-dataset_test= CSVDataset(csv_file=data, transform=transform, train=False, ImageType=IMAGE_TYPE)
+dataset_test= CSVDataset(csv_file=data, transform=transform, train=False, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_PATH)
 data_test= DataLoader(dataset_test, batch_size=BATCH_SIZE)
 model = CNNWithAttention(hidden_dim=Number_of_neurons ,channel=IMAGE_TYPE) 
 model.to('cuda')
