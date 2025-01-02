@@ -9,6 +9,8 @@ from Classifier.classifier import CNNWithAttention
 from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
 
+from finalFile import * #per il file finale
+
 
 
 
@@ -27,12 +29,28 @@ data = {
 probs = {"people": {}
 }
 
+
+
+
+
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
             raise TypeError("Input deve essere un'immagine PIL.Image")
         return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
+    
+def init(data, id):
+    prs={"id" : id,
+    "gender" : [],
+    "bag" : [],
+    "hat" : [],
+    "trajectory" : []
+    }
+    while len(data["people"]) < id:
+        data["people"].append(None)
+    data["people"][id-1] = prs
+    return data
     
 class CLAHE:
     def __init__(self):
@@ -277,10 +295,12 @@ def my_track(video_path, tracker, show=False):
                         person["bag"] = new_person["bag"]
 
                         prs = probs["people"][new_person["id"]]
+
                         prs["gender_pred"].append(new_person["gender"])
                         prs["bag_pred"].append(new_person["bag"])
                         prs["hat_pred"].append(new_person["hat"])
 
+            
                         bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
                         person["bag"] = bag_pred
 
@@ -289,10 +309,14 @@ def my_track(video_path, tracker, show=False):
 
                         hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
                         person["hat"] = hat_pred
-                        
+
+                        final_f = append(final_f, int(id.item()), gender_pred, bag_pred, hat_pred)
+
                         # Aggiungi la nuova traiettoria
                         if(person["trajectory"][-1]!=trajectory):
                             person["trajectory"].append(trajectory)
+                            final_f["people"][int(id.item()-1)]["trajectory"].append(trajectory)
+
                         id_text=f"{int(person['id'])}"
                         gender_text = f"Gender: {person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
@@ -308,20 +332,18 @@ def my_track(video_path, tracker, show=False):
                         trajectory_1 = sum(1 for person in data["people"].values() if 1 in person["trajectory"])
                         trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
                     else:
+                        final_f = init(final, int(id.item())) #file finale
                         data["people"][new_person["id"]] = new_person
 
                         pr = {"id": id.item(), "gender_pred": [], "bag_pred": [], "hat_pred": []}
+                        
                         probs["people"][new_person["id"]] = pr
+
                         prs = probs["people"][new_person["id"]]
-                        prs["gender_pred"].append(new_person["gender"])
+
+                        prs["gender_pred"].append(new_person["gender"]) #file delle probabilità totali 
                         prs["bag_pred"].append(new_person["bag"])
                         prs["hat_pred"].append(new_person["hat"])
-
-                        bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
-                        gender_pred = "Female" if has_gender_peak(prs["gender_pred"]) else "Male"
-                        hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
-                        
-
 
 
                         id_text=f"{int(new_person['id'])}"
@@ -343,16 +365,18 @@ def my_track(video_path, tracker, show=False):
                 break
 
     cv2.destroyAllWindows()
+    return final_f
 
 
-
-
+final = {
+    "people" : []
+}
 
 video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
-my_track(video_path, tracker, show)
+final_f = my_track(video_path, tracker, show)
 
 # Scrittura del file JSON
 file_path = './src/Tracking/videos/data.json'
@@ -364,6 +388,14 @@ file_path = './src/Tracking/videos/probs.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(probs, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
+
+print(final_f)
+final = classify(final_f)
+file_path = './src/Tracking/videos/results.json'
+with open(file_path, 'w', encoding='utf-8') as file:
+    json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
+    print(f"File salvato in {file_path}")
+
 
 
 
