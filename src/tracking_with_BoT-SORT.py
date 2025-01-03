@@ -10,10 +10,6 @@ from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
 
 
-
-
-
-
 # path_corrente = os.getcwd()
 # print(f"Il path corrente è: {path_corrente}")
 
@@ -23,7 +19,12 @@ data = {
     "people": {},  # Dizionario con ID come chiavi e dati della persona come valori
     "trajectory":[]
 }
-
+id_trajectory = {
+    
+}
+line_dict={
+    "line":{}
+}
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
@@ -33,6 +34,17 @@ class HistogramEqualization:
 transform= transforms.Compose([transforms.Resize((224, 224)), HistogramEqualization(), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
 
 
+
+def calculate_crossing(box, box2, center, arrowEnd):
+    
+    vet_track = np.array([box2[2] - box[2], box2[3] - box[3]])
+    vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
+    dot_product = np.dot(vet_track, vet_line)
+    if dot_product > 0:
+        return True
+    else: 
+        return False
+    
 # Funzione per calcolare l'orientamento (cross product) di tre punti
 def orientation(p, q, r):
     return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
@@ -42,17 +54,22 @@ def on_segment(p, q, r):
     return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
 
 def do_intersect(p1, q1, p2, q2):
+    x1,y1,x2,y2 = p1
+    x3,y3,x4,y4 = q1
+    
+    p1= ((x1+x2)/2,y2)
+    q1= ((x3+x4)/2,y4)
+
+
     # Calcolare le 4 orientazioni
     o1 = orientation(p1, q1, p2)
     o2 = orientation(p1, q1, q2)
     o3 = orientation(p2, q2, p1)
     o4 = orientation(p2, q2, q1)
-    
     # Generale caso
     if o1 * o2 < 0 and o3 * o4 < 0:
         return True
-    
-    # Casuali casi di collineari
+    # Controllo collineare
     if o1 == 0 and on_segment(p1, p2, q1):
         return True
     if o2 == 0 and on_segment(p1, q2, q1):
@@ -61,56 +78,73 @@ def do_intersect(p1, q1, p2, q2):
         return True
     if o4 == 0 and on_segment(p2, q1, q2):
         return True
-    
     return False
 
 
-def getPoints(frame):
-    # Parametri per test1
-    x_real = np.array([-4.6, -4.6, 4.6, 4.6])
-    y_real = np.array([9, 14.00, 9, 14.00])
-    z_real = np.zeros_like(x_real)
-    xt= 0
-    yt= 0
-    zt= 7.20  # Coordinate della camera
-    thyaw = 0* np.pi / 180  # Z
-    thpitch = (((360-32) * np.pi) / 180)  # X
-    throll = 0 * np.pi / 180  # Y
-    f = 0.003  # Distanza focale (m)
-    s_w = 0.00498  # Larghezza sensore (m)
-    s_h = 0.003  # Altezza sensore (m)
-    U = frame.shape[1]   # Larghezza immagine (pixel)
-    V = frame.shape[0]  # Altezza immagine (pixel)
-    return inversion_points(x_real=x_real, y_real=y_real, z_real=z_real, camera_x=xt, camera_y=yt, camera_z=zt, thyaw=thyaw, thpitch=thpitch, throll=throll, focal=f, resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
+def get_config(file_path):
+    with open(file_path, 'r') as f:
+        config = json.load(f)
+        config["x_real"] = (config["x_real"])
+        config["y_real"] = (config["y_real"])
+        config["z_real"] = np.zeros_like(config["x_real"])
+        config["thyaw"] = config["thyaw"] * np.pi / 180
+        config["thpitch"] = (360 - config["thpitch"]) * np.pi / 180
+        config["throll"] = config["throll"] * np.pi / 180
+    return config
 
-def drawLine(frame,p1,p2,orientation):
+def getPoints(frame, config_path='./src/config/config.json'):
+    config = get_config(config_path)
+    U = frame.shape[1]  # Larghezza immagine (pixel)
+    V = frame.shape[0]  # Altezza immagine (pixel)
+    return inversion_points(
+        x_real=config["x_real"],
+        y_real=config["y_real"],
+        z_real = config["z_real"],
+        camera_x=config["xt"],
+        camera_y=config["yt"],
+        camera_z=config["zt"],
+        thyaw=config["thyaw"],
+        thpitch=config["thpitch"],
+        throll=config["throll"],
+        focal=config["f"],
+        resolution_x=U,
+        resolution_y=V,
+        sensor_x=config["s_w"],
+        sensor_y=config["s_h"]
+    )
+
+
+def drawLine(frame,p1,p2, i):
     cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=1)  # Cerchi rossi
     cx = (p1[0] + p2[0]) // 2
     cy = (p1[1] + p2[1]) // 2
-    center = (cx, cy)
-     # Calcola la pendenza della retta tra P1 e P2
-    if p1[0] - p2[0] != 0:
-        m12 = (p2[1] - p1[1]) / (p2[0] - p1[0])
-        m_perp = -1 / m12 
-    else:
-        m_perp = 0 
-    dx = 30 / math.sqrt(1 + m_perp**2)
-    dy = m_perp * dx
-    
-    
-    if(orientation):
-        third_point = (int(cx + dx), int(cy + dy))  # Terzo punto sopra
-    else:
-        third_point = (int(cx - dx), int(cy - dy))  # Terzo punto sotto
-    cv2.arrowedLine(frame, center, third_point, color=(255, 0, 0), thickness=2)
-    
+    dx = p1[0] - p2[0]
+    dy = p1[1] - p2[1]
+
+    length = np.sqrt(dx**2 + dy**2) 
+    unit_dx = dx / length
+    unit_dy = dy / length
+
+    perp_dx = -unit_dy
+    perp_dy = unit_dx
+    arrowEnd=(int(cx+perp_dx*25),int(cy+perp_dy*25))
+    cv2.arrowedLine(frame, (cx, cy), arrowEnd, (255, 0, 0), thickness=2)
+
+    cv2.putText(frame, str(i),(p1[0],p1[1]+15),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
+    new_line = {        "id": i,
+                        "p1": p1,
+                        "p2": p2,
+                        "center": (cx,cy),
+                        "arrowEnd": arrowEnd
+                    }
+    line_dict["line"][new_line["id"]]= new_line
     return frame
 
 def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
-    cropped_img = Image.fromarray(cropped_img).convert('RGB')
+    cropped_img = Image.fromarray(cropped_img)
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
     cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
@@ -152,21 +186,22 @@ def my_track(video_path, tracker, show=False):
     # Prendo image prima solo per disegnare le linee
     image=next(results)
     frame=image.orig_img
+    
     points=getPoints(frame)
     extra_width = 30  
     line_height = 20
-
+    trajectory=(len(points)//2)
     for i,result in enumerate(results):
         if i%2 == 0:
+            count_line=0
             frame = result.orig_img.copy()
             frame_original = result.orig_img  # Immagine originale del frame
-            trajectory=0
-            orientation=True
-            for i,point in enumerate(points):
-                if(i%2==1):
-                    frame=drawLine(frame,point,point_temp,orientation)
-                    orientation=False
-                point_temp=point
+            traj=0
+            
+            for j in range(0, len(points) - 1, 2):  # Itera con passi di 2
+                count_line+=1
+                frame = drawLine(frame,points[j],points[j+1], count_line)
+                
             # Itera su ogni bounding box e ID
             if result.boxes.xyxy is not None and result.boxes.id is not None:
                 for box, id in zip(result.boxes.xyxy, result.boxes.id):
@@ -177,12 +212,12 @@ def my_track(video_path, tracker, show=False):
 
                     # Classificazioni (gender, hat, bag)
                     gender, bag, hat = classifier_model(img)
-                    gender_pred = torch.sigmoid(gender) > 0.5 #0.4
+                    gender_pred = torch.sigmoid(gender) > 0.4 #0.4
                     hat_pred = torch.sigmoid(hat) > 0.5
-                    bag_pred = torch.sigmoid(bag) > 0.5 #0.3
+                    bag_pred = torch.sigmoid(bag) > 0.3 #0.3
                     # Disegna il bounding box sul frame
 
-                    box_x, box_y, box_width, box_height = 10, 10, 250, 100  
+                    box_x, box_y, box_width, box_height = 10, 10, 250, 33*(trajectory+1)  
                     cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2) # qua disegna i bounding_box
                     cv2.rectangle(frame,(x1,y1),(x1+20,y1+20),(255,255,255),-1)
@@ -190,11 +225,16 @@ def my_track(video_path, tracker, show=False):
                     x1_extended = max(x1_extended, 0)
                     x2_extended = min(x2_extended, frame.shape[1])
                     cv2.rectangle(frame, (x1_extended, y2), (x2_extended, y2 + text_box_height), (255, 255, 255), -1)  # Box bianco
+                    if(id.item() in data["people"]):
+                        person=data["people"][id.item()]
+                        for k in range(trajectory):
+                            if(do_intersect(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][k+1]["p1"],line_dict["line"][k+1]["p2"])):
+                                if(calculate_crossing(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][k+1]["center"],line_dict["line"][k+1]["arrowEnd"])):
+                                    traj=k+1
+                                        
 
-                    if(do_intersect((x1,y1),(x2,y2),points[0],points[1])):
-                        trajectory=1
-                    if(do_intersect((x1,y1),(x2,y2),points[2],points[3])):
-                        trajectory=1
+                    
+                            
                             
                     # Crea un dizionario con le informazioni
                     
@@ -203,7 +243,8 @@ def my_track(video_path, tracker, show=False):
                         "gender": "Female" if gender_pred else "Male",
                         "hat": "Yes" if hat_pred else "No",
                         "bag": "Yes" if bag_pred else "No",
-                        "trajectory": [trajectory]
+                        "trajectory": [],
+                        "xyxy":(x1,y1,x2,y2)
                     }
                     if new_person["id"] in data["people"]:
                         # Aggiorna la persona esistente
@@ -211,39 +252,48 @@ def my_track(video_path, tracker, show=False):
                         person["gender"] = new_person["gender"]
                         person["hat"] = new_person["hat"]
                         person["bag"] = new_person["bag"]
+                        person["xyxy"] = new_person["xyxy"]
                         # Aggiungi la nuova traiettoria
-                        if(person["trajectory"][-1]!=trajectory):
-                            person["trajectory"].append(trajectory)
+                        
+                        if(len(person["trajectory"])>0):
+                            if(person["trajectory"][-1]!=traj and traj!=0):
+                                person["trajectory"].append(traj)
+                        elif traj!=0:
+                            person["trajectory"].append(traj)
                         id_text=f"{int(person['id'])}"
                         gender_text = f"Gender: {person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
-                        trajectory_text = f"Trajectory: {person['trajectory'] }"
+                        if(person['trajectory'] is not None):
+                            trajectory_text = f"Trajectory: {person['trajectory'] }"
+                        else:
+                            trajectory_text = f"Trajectory: []"
                         cv2.putText(frame,id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
                         cv2.putText(frame, gender_text, (x1_extended, y2 + line_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
-                        total_people= len(data["people"])
-                        cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-                        cv2.putText(frame, f"Trajectory 1: {trajectory_1}", (box_x + 10, box_y + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-                        cv2.putText(frame, f"Trajectory 2: {trajectory_2}", (box_x + 10, box_y + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-                        trajectory_1 = sum(1 for person in data["people"].values() if 1 in person["trajectory"])
-                        trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
+
                     else:
                         data["people"][new_person["id"]] = new_person
                         id_text=f"{int(new_person['id'])}"
                         gender_text = f"Gender: {new_person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if new_person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if new_person['bag'] == 'Yes' else 'No'}"
-                        trajectory_text = f"Trajectory: {new_person['trajectory']}"    
-                        cv2.putText(frame,id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
+                        if(new_person['trajectory'] is not None):
+                            trajectory_text = f"Trajectory: {new_person['trajectory'] }"
+                        else:
+                            trajectory_text = f"Trajectory: []"
+                        cv2.putText(frame, id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
                         cv2.putText(frame, gender_text, (x1_extended, y2 + line_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
-                        total_people= len(data["people"])
-                        cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-                        trajectory_1 = sum(1 for person in data["people"].values() if 1 in person["trajectory"])
-                        trajectory_2 = sum(1 for person in data["people"].values() if 2 in person["trajectory"])
-                    trajectory=0
+                    traj= 0
+            total_people= len(result)
+            cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+            for i in range (trajectory):
+                e=sum(1 for person in data["people"].values() if i+1 in person["trajectory"])
+                cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+
             # Mostra il frame con i risultati
+            frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -264,6 +314,5 @@ file_path = './src/Tracking/videos/data.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(data, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
-
 
 
