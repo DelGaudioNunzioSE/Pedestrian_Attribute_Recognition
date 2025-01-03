@@ -64,7 +64,7 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    CLAHE(),
+    #CLAHE(),
     transforms.ToTensor(),
     transforms.Resize((224, 224)),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -113,15 +113,18 @@ def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.4, window_size=20, peak_threshold=0.8):
+def has_bag_peak(probabilities, threshold=0.3, window_size=30):
+    # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
+    # Calcola la media delle probabilità recenti
+    recent_probs = np.array(recent_probs)  # Converte la lista in un array NumPy
+    recent_probs[recent_probs > 0.5] *= 1.5
     avg_prob = sum(recent_probs) / len(recent_probs)
-    max_prob = max(recent_probs)
-
-    return avg_prob > threshold or max_prob > peak_threshold
+    # Se la media supera la soglia, restituisce True (c'è lo zaino)
+    return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.4, window_size=10):
+def has_hat_peak(probabilities, threshold=0.3, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -222,7 +225,7 @@ def my_track(video_path, tracker, show=False):
 
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
+                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=2, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
@@ -372,7 +375,7 @@ final = {
     "people" : []
 }
 
-video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/Example.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
@@ -391,7 +394,7 @@ with open(file_path, 'w', encoding='utf-8') as file:
 
 print(final_f)
 final = classify(final_f)
-file_path = './src/Tracking/videos/results.json'
+file_path = './src/Tracking/videos/results_greco.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")

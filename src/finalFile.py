@@ -23,7 +23,7 @@ def classify_gender(final_file):
     for person in final_file["people"]:
         male_count = 0
         female_count = 0
-        if "gender" in person:
+        if person is not None and "gender" in person:
             # Itera su ogni valore nella lista "gender"
             for gender in person["gender"]:
                 if gender == "Male":
