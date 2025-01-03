@@ -31,6 +31,24 @@ def uniform_brightness_rgb(frame, threshold=[100,100,100], incrise=1.5 ,decrise=
     
     return frame
 
+
+def easy_uniform_brightness_rgb(frame, threshold=[100,100,100], incrise=1.2 ,decrise=0):
+    
+    # Applica la soglia a ciascun canale
+
+    # Applica la trasformazione solo ai pixel sotto la soglia per ogni canale
+    frame[:,:,0] =  cv2.convertScaleAbs(frame[:,:,0], alpha=incrise, beta=decrise)
+    # Canale verde
+    frame[:,:,1] = cv2.convertScaleAbs(frame[:,:,1], alpha=incrise, beta=decrise)
+    # Canale blu
+    frame[:,:,2] = cv2.convertScaleAbs(frame[:,:,2], alpha=incrise, beta=decrise)
+
+    frame[:,:,0] = np.clip(frame[:,:,0], 0, 255)
+    frame[:,:,1] = np.clip(frame[:,:,1], 0, 255)
+    frame[:,:,2] = np.clip(frame[:,:,2], 0, 255)
+    
+    return frame
+
 def histo(img_rgb):
         r, g, b = cv2.split(img_rgb)
 
@@ -52,11 +70,11 @@ def histo(img_rgb):
 
 
 TRANSFORM = [
-    histo,  # Applica luminosità uniforme per canale RGB
+    easy_uniform_brightness_rgb,  # Applica luminosità uniforme per canale RGB
 ]
 
 video_path = "./src/Tracking/videos/Atrio.mp4"
-play_video_with_fps(video_path, 60, transformations= TRANSFORM, output_path="./src/Tracking/videos/Atrio_bright.mp4")
+play_video_with_fps(video_path, 120, transformations= TRANSFORM, output_path="./src/Tracking/videos/Atrio_bright.mp4")
 
 
 

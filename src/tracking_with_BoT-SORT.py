@@ -375,7 +375,11 @@ final = {
     "people" : []
 }
 
+<<<<<<< HEAD
 video_path = './src/Tracking/videos/Example.mp4' # Path to the input video file (`video_fish.mp4`)
+=======
+video_path = './src/Tracking/videos/Atrio_bright.mp4' # Path to the input video file (`video_fish.mp4`)
+>>>>>>> 9f59eb32b9404e1343d98cfd2c13854ecb473b77
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
