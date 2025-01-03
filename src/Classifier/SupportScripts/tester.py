@@ -96,7 +96,7 @@ class Tester:
                 loss_bag = adjustedLoss(bag, labels[:, 1], pos_weight= self.POS_WEIGHT_BAG)
                 loss_hat = adjustedLoss(hat, labels[:, 2], pos_weight= self.POS_WEIGHT_HAT)
 
-                loss_val = loss_gender + loss_bag + loss_hat
+                loss_val = total_loss_fuction(loss_gender, loss_bag, loss_hat, gender_weight = gender_weight,  bag_weight=bag_weight, hat_weight=hat_weight)
                         
                 val_loss += loss_val.item()
 

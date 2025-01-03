@@ -27,17 +27,17 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = '_canny_'
-NUMBER_OF_NEURONS=int(512/2)
+LEARNING_COMMENT = '_BIGGEST'
+NUMBER_OF_NEURONS=int(512)
 DEBUG = False
+CLASS_WEIGHTS = False
 TIMESTAMP = False
-CLASS_WEIGHTS= False # Paolo's
 MODEL_PATH=None # if you wanto to start from a previous model
 
 # Nunzio's
-REORDER=False # Nunzio's reorder
-IMAGE_TYPE='L' # RGB or L balck and white
-HOMEMADE_IMGE_PATH = './src/Classifier/Datasets/canny_training_set/'
+REORDER=True # Nunzio's reorder
+IMAGE_TYPE='RGB' # RGB or L balck and white
+HOMEMADE_IMGE_PATH = None
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -46,21 +46,13 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-
-BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
+BATCH_SIZE = int(128*2) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.00001
-NUM_EPOCHS = 10
-GENDER_LOSS_WEIGHT = 0.25
-BAG_LOSS_WEIGHT = 0.5
-HAT_LOSS_WEIGHT = 0.25
-BATCH_SIZE = 32 #Reduce if you have GPU's memory problems
-VALIDATION_SIZE = 0.2
-LEARNING_RATE = 0.0001 #buone prestazioni con 0.0001
-NUM_EPOCHS = 5
-GENDER_LOSS_WEIGHT = 0.2
-BAG_LOSS_WEIGHT = 0.6
-HAT_LOSS_WEIGHT = 0.2
+NUM_EPOCHS = 20
+GENDER_LOSS_WEIGHT = 3
+BAG_LOSS_WEIGHT = 5
+HAT_LOSS_WEIGHT = 2
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
@@ -76,22 +68,31 @@ class HistogramEqualization:
 
 ##### DATA AUGMENTATION ######################################
 ####################################################
-if IMAGE_TYPE=='L':
-    TRANSFORMS = transforms.Compose([#transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-                                    transforms.RandomHorizontalFlip(),
-                                    # HistogramEqualization(),
-                                    transforms.ToTensor(),
-                                    transforms.Resize((224, 224))
-                                    #transforms.Normalize(mean=[0.5], std=[0.5])
+if IMAGE_TYPE=='RGB':
+    print('Image type is RGB')
+    TRAIN_TRANSFORMS = transforms.Compose([
+        transforms.Resize((224, 224)),  # Resize all images to a uniform size
+        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        transforms.ToTensor(),
+        transforms.RandomErasing(p=0.3, scale=(0.02, 0.33), ratio=(2.2, 3.5)), # occlusion
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
+
+    VAL_TRANSFORMS = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    
 else: 
-    TRANSFORMS = transforms.Compose([#transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    TRANSFORMS = transforms.Compose([transforms.Resize((224, 224)),
+                                    transforms.ColorJitter(brightness=0.7, contrast=0.7, saturation=0.7, hue=0.7),
                                     transforms.RandomHorizontalFlip(),
                                     # HistogramEqualization(),
                                     transforms.ToTensor(),
-                                    transforms.Resize((224, 224)),
-                                    transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225]) # resbet50 normalization
+                                    transforms.Normalize(mean=[0.5], std=[0.5])
     ])
+    
 
 
 
@@ -106,11 +107,11 @@ else:
 
 
 # Reading new dataset
-data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';',nrows=10000)
+data = pd.read_csv(CSV_NEW_TRAINING_FILE, sep=';')
 train_data, val_data = train_test_split(data, test_size=VALIDATION_SIZE, random_state=42)
 
-dataset_train = CSVDataset(csv_file=train_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
-dataset_valid = CSVDataset(csv_file=val_data, transform=TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
+dataset_train = CSVDataset(csv_file=train_data, transform=TRAIN_TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
+dataset_valid = CSVDataset(csv_file=val_data, transform=VAL_TRANSFORMS, train=True, ImageType=IMAGE_TYPE,homade_path=HOMEMADE_IMGE_PATH)
 
 
 
@@ -161,7 +162,7 @@ if MODEL_PATH != None:
 # Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 #scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
-scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=5, mode='triangular') # Nunzio's
+scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
 ###########################################################
 
 
@@ -190,7 +191,7 @@ for epoch in range(NUM_EPOCHS):
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
         loss_bag = adjustedLoss(bag, labels[:,1],pos_weight=POS_WEIGHT_BAG)
         loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_HAT)
-        loss = loss_gender + loss_bag + loss_hat
+        loss = total_loss_fuction(loss_gender, loss_bag, loss_hat, gender_weight = GENDER_LOSS_WEIGHT,  bag_weight=BAG_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT)
 
 
         # Backward pass and optimization

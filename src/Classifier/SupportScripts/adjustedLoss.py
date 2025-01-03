@@ -21,8 +21,6 @@ def adjustedLoss(prediction, labels, pos_weight ):
 
 
 def total_loss_fuction(loss_gender,loss_bag, loss_hat, gender_weight = 1/3,  bag_weight=1/3, hat_weight=1/3):
-      if (gender_weight+hat_weight+bag_weight) != 1:
-            print('Total weight is not 1!')
 
       total_loss= (gender_weight * loss_gender) + (hat_weight * loss_hat) + (bag_weight * loss_bag)
       return total_loss

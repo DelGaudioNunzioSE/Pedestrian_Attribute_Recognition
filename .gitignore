@@ -1,5 +1,5 @@
 __pycache__/
-src/Tracking/videos/
+src/Tracking/videos/*
 src/Classifier/Datasets/validation_set/*
 src/Classifier/Datasets/training_set/*
 src/Classifier/Datasets/

@@ -9,6 +9,12 @@ from Classifier.classifier import CNNWithAttention
 from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
 
+from finalFile import * #per il file finale
+
+
+
+
+
 
 # path_corrente = os.getcwd()
 # print(f"Il path corrente è: {path_corrente}")
@@ -19,19 +25,55 @@ data = {
     "people": {},  # Dizionario con ID come chiavi e dati della persona come valori
     "trajectory":[]
 }
-id_trajectory = {
-    
-}
+
 line_dict={
     "line":{}
 }
+
+probs = {"people": {}
+}
+
+
+
+
+
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
             raise TypeError("Input deve essere un'immagine PIL.Image")
         return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
-transform= transforms.Compose([transforms.Resize((224, 224)), HistogramEqualization(), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
+    
+def init(data, id):
+    prs={"id" : id,
+    "gender" : [],
+    "bag" : [],
+    "hat" : [],
+    "trajectory" : []
+    }
+    while len(data["people"]) < id:
+        data["people"].append(None)
+    data["people"][id-1] = prs
+    return data
+    
+class CLAHE:
+    def __init__(self):
+        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    
+    def __call__(self, img):
+        img = np.array(img)
+        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img_clahe = self.clahe.apply(img_gray)
+        img_rgb = cv2.cvtColor(img_clahe, cv2.COLOR_GRAY2RGB)
+        return Image.fromarray(img_rgb)
+
+transform = transforms.Compose([
+    CLAHE(),
+    transforms.ToTensor(),
+    transforms.Resize((224, 224)),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+
 
 
 
@@ -79,6 +121,33 @@ def do_intersect(p1, q1, p2, q2):
     if o4 == 0 and on_segment(p2, q1, q2):
         return True
     return False
+
+
+    
+def has_gender_peak(probabilities, threshold=0.6, window_size=20):
+    # Considera solo le ultime N predizioni
+    recent_probs = probabilities[-window_size:]
+    # Calcola la media delle probabilità recenti
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    # Se la media supera la soglia, restituisce True (c'è lo zaino)
+    return avg_prob > threshold
+
+def has_bag_peak(probabilities, threshold=0.4, window_size=20, peak_threshold=0.8):
+    recent_probs = probabilities[-window_size:]
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    max_prob = max(recent_probs)
+
+    return avg_prob > threshold or max_prob > peak_threshold
+
+    
+def has_hat_peak(probabilities, threshold=0.4, window_size=10):
+    # Considera solo le ultime N predizioni
+    recent_probs = probabilities[-window_size:]
+    # Calcola la media delle probabilità recenti
+    avg_prob = sum(recent_probs) / len(recent_probs)
+    # Se la media supera la soglia, restituisce True (c'è lo zaino)
+    return avg_prob > threshold
+
 
 
 def get_config(file_path):
@@ -140,6 +209,22 @@ def drawLine(frame,p1,p2, i):
     line_dict["line"][new_line["id"]]= new_line
     return frame
 
+def histo(img_rgb):
+        r, g, b = cv2.split(img_rgb)
+
+        # Equalizzazione dell'istogramma per ciascun canale
+        r_equalized = cv2.equalizeHist(r)
+        g_equalized = cv2.equalizeHist(g)
+        b_equalized = cv2.equalizeHist(b)
+
+        # Ricompone l'immagine a colori con i canali equalizzati
+        img_equalized = cv2.merge([r_equalized, g_equalized, b_equalized])
+
+        # Converti l'immagine back a BGR per il salvataggio
+        img_equalized_bgr = cv2.cvtColor(img_equalized, cv2.COLOR_RGB2BGR)
+
+        return img_equalized_bgr
+
 def drawBox(box, frame,device):
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
@@ -164,7 +249,7 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention(hidden_dim=512)   
-    checkpoint = torch.load('./src/Classifier/Models/HistogramEqualization_512_neurons_7_01_0818.pth')
+    checkpoint = torch.load('./src/Classifier/Models/_BIGGEST_weight_4_try.pth')
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
@@ -175,7 +260,7 @@ def my_track(video_path, tracker, show=False):
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
                           stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
-                          ,iou = 0.7, max_det=30, persist=True, half=True)
+                          ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
     #1920x1080 riesce a prendersi il ragazzo dietro
@@ -212,9 +297,9 @@ def my_track(video_path, tracker, show=False):
 
                     # Classificazioni (gender, hat, bag)
                     gender, bag, hat = classifier_model(img)
-                    gender_pred = torch.sigmoid(gender) > 0.4 #0.4
-                    hat_pred = torch.sigmoid(hat) > 0.5
-                    bag_pred = torch.sigmoid(bag) > 0.3 #0.3
+                    gender_pred = torch.sigmoid(gender)  #0.4
+                    hat_pred = torch.sigmoid(hat)  
+                    bag_pred = torch.sigmoid(bag) #0.3
                     # Disegna il bounding box sul frame
 
                     box_x, box_y, box_width, box_height = 10, 10, 250, 33*(trajectory+1)  
@@ -240,9 +325,9 @@ def my_track(video_path, tracker, show=False):
                     
                     new_person = {
                         "id": id.item(),
-                        "gender": "Female" if gender_pred else "Male",
-                        "hat": "Yes" if hat_pred else "No",
-                        "bag": "Yes" if bag_pred else "No",
+                        "gender": gender_pred.item(),
+                        "hat": hat_pred.item(),
+                        "bag": bag_pred.item(),
                         "trajectory": [],
                         "xyxy":(x1,y1,x2,y2)
                     }
@@ -253,6 +338,25 @@ def my_track(video_path, tracker, show=False):
                         person["hat"] = new_person["hat"]
                         person["bag"] = new_person["bag"]
                         person["xyxy"] = new_person["xyxy"]
+
+                        prs = probs["people"][new_person["id"]]
+
+                        prs["gender_pred"].append(new_person["gender"])
+                        prs["bag_pred"].append(new_person["bag"])
+                        prs["hat_pred"].append(new_person["hat"])
+
+            
+                        bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
+                        person["bag"] = bag_pred
+
+                        gender_pred = "Female" if has_gender_peak(prs["gender_pred"]) else "Male"
+                        person["gender"] = gender_pred
+
+                        hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
+                        person["hat"] = hat_pred
+
+                        final_f = append(final_f, int(id.item()), gender_pred, bag_pred, hat_pred)
+
                         # Aggiungi la nuova traiettoria
                         
                         if(len(person["trajectory"])>0):
@@ -260,6 +364,8 @@ def my_track(video_path, tracker, show=False):
                                 person["trajectory"].append(traj)
                         elif traj!=0:
                             person["trajectory"].append(traj)
+                            final_f["people"][int(id.item()-1)]["trajectory"].append(trajectory)
+
                         id_text=f"{int(person['id'])}"
                         gender_text = f"Gender: {person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
@@ -273,7 +379,20 @@ def my_track(video_path, tracker, show=False):
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
 
                     else:
+                        final_f = init(final, int(id.item())) #file finale
                         data["people"][new_person["id"]] = new_person
+
+                        pr = {"id": id.item(), "gender_pred": [], "bag_pred": [], "hat_pred": []}
+                        
+                        probs["people"][new_person["id"]] = pr
+
+                        prs = probs["people"][new_person["id"]]
+
+                        prs["gender_pred"].append(new_person["gender"]) #file delle probabilità totali 
+                        prs["bag_pred"].append(new_person["bag"])
+                        prs["hat_pred"].append(new_person["hat"])
+
+
                         id_text=f"{int(new_person['id'])}"
                         gender_text = f"Gender: {new_person['gender']}"
                         hat_bag_text = f"Hat: {'Yes' if new_person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if new_person['bag'] == 'Yes' else 'No'}"
@@ -299,20 +418,37 @@ def my_track(video_path, tracker, show=False):
                 break
 
     cv2.destroyAllWindows()
+    return final_f
 
 
-
+final = {
+    "people" : []
+}
 
 video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
-my_track(video_path, tracker, show)
+final_f = my_track(video_path, tracker, show)
 
 # Scrittura del file JSON
 file_path = './src/Tracking/videos/data.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(data, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
+
+file_path = './src/Tracking/videos/probs.json'
+with open(file_path, 'w', encoding='utf-8') as file:
+    json.dump(probs, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
+    print(f"File salvato in {file_path}")
+
+print(final_f)
+final = classify(final_f)
+file_path = './src/Tracking/videos/results.json'
+with open(file_path, 'w', encoding='utf-8') as file:
+    json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
+    print(f"File salvato in {file_path}")
+
+
 
 
