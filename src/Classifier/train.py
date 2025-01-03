@@ -46,13 +46,13 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = 128 #Reduce if you have GPU's memory problems
+BATCH_SIZE = int(128*2) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.00001
 NUM_EPOCHS = 20
-GENDER_LOSS_WEIGHT = 0.2
-BAG_LOSS_WEIGHT = 0.7
-HAT_LOSS_WEIGHT = 0.1
+GENDER_LOSS_WEIGHT = 3
+BAG_LOSS_WEIGHT = 5
+HAT_LOSS_WEIGHT = 2
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
@@ -74,7 +74,7 @@ if IMAGE_TYPE=='RGB':
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
         transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
         transforms.ToTensor(),
-        transforms.RandomErasing(p=0.2, scale=(0.02, 0.33), ratio=(2, 3.3)), # occlusion
+        transforms.RandomErasing(p=0.3, scale=(0.02, 0.33), ratio=(2.2, 3.5)), # occlusion
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
@@ -191,7 +191,7 @@ for epoch in range(NUM_EPOCHS):
         loss_gender = adjustedLoss(gender, labels[:,0],pos_weight= POS_WEIGHT_GENDER)
         loss_bag = adjustedLoss(bag, labels[:,1],pos_weight=POS_WEIGHT_BAG)
         loss_hat = adjustedLoss(hat, labels[:,2],pos_weight=POS_WEIGHT_HAT)
-        loss = loss_gender + loss_bag + loss_hat
+        loss = total_loss_fuction(loss_gender, loss_bag, loss_hat, gender_weight = GENDER_LOSS_WEIGHT,  bag_weight=BAG_LOSS_WEIGHT, hat_weight=HAT_LOSS_WEIGHT)
 
 
         # Backward pass and optimization

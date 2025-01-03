@@ -38,18 +38,21 @@ class CNNWithAttention(nn.Module):
         #self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
         #self.resnet_out_channels = 2048  # Per resnet18/34, resnet50 usa 2048    
 
-        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-        
+
+        # Carica ResNet-34 pre-addestrato
+        resnet = models.resnet34(weights=models.ResNet34_Weights.DEFAULT)
+
         # Gestione delle immagini in bianco e nero (1 canale)
         if channel == 'L':  # Se le immagini sono in scala di grigio
             resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
             print('Model: black and white mode')
-        
+
         # Rimuovi l'ultimo layer fully connected e la parte di pooling finale
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
-        
-        # Uscita della rete, la dimensione di uscita per ResNet-18 è 512, per ResNet-50 è 2048
-        self.resnet_out_channels = 512  # Per ResNet-18, l'output dei canali è 512
+
+        # Uscita della rete, la dimensione di uscita per ResNet-34 è 512 (come ResNet-18)
+        self.resnet_out_channels = 512  # Per ResNet-34, l'output dei canali è 512
+
 
 
 
