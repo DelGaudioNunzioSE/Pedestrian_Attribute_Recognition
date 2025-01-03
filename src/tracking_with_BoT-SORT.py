@@ -154,7 +154,7 @@ def getPoints(frame):
     return inversion_points(x_real=x_real, y_real=y_real, z_real=z_real, camera_x=xt, camera_y=yt, camera_z=zt, thyaw=thyaw, thpitch=thpitch, throll=throll, focal=f, resolution_x=U, resolution_y=V, sensor_x=s_w, sensor_y=s_h)
 
 def drawLine(frame,p1,p2,orientation):
-    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=1)  # Cerchi rossi
+    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=3)  # Cerchi rossi
     cx = (p1[0] + p2[0]) // 2
     cy = (p1[1] + p2[1]) // 2
     center = (cx, cy)
@@ -172,7 +172,7 @@ def drawLine(frame,p1,p2,orientation):
         third_point = (int(cx + dx), int(cy + dy))  # Terzo punto sopra
     else:
         third_point = (int(cx - dx), int(cy - dy))  # Terzo punto sotto
-    cv2.arrowedLine(frame, center, third_point, color=(255, 0, 0), thickness=2)
+    cv2.arrowedLine(frame, center, third_point, color=(255, 0, 0), thickness=3)
     
     return frame
 
@@ -322,7 +322,7 @@ def my_track(video_path, tracker, show=False):
                             final_f["people"][int(id.item()-1)]["trajectory"].append(trajectory)
 
                         id_text=f"{int(person['id'])}"
-                        gender_text = f"Gender: {person['gender']}"
+                        gender_text = f"Gender: {'M' if person['gender'] == 'Male' else 'F'}"
                         hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
                         trajectory_text = f"Trajectory: {person['trajectory'] }"
                         cv2.putText(frame,id_text,(x1,y1+15),cv2.FONT_HERSHEY_SIMPLEX,0.6,(0,0,255),1)
