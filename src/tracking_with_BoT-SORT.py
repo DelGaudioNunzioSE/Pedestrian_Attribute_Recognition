@@ -69,6 +69,7 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
+    #transforms.Resize((90, 200)),
     transforms.Resize((224, 224)),
     CLAHE(),
     transforms.ToTensor(),
@@ -133,7 +134,7 @@ def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.3, window_size=30):
+def has_bag_peak(probabilities, threshold=0.5, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -366,9 +367,10 @@ def my_track(video_path, tracker, show=False):
                         if(len(person["trajectory"])>0):
                             if(person["trajectory"][-1]!=traj and traj!=0):
                                 person["trajectory"].append(traj)
+                                final_f["people"][int(id.item()-1)]["trajectory"].append(traj)
                         elif traj!=0:
                             person["trajectory"].append(traj)
-                            final_f["people"][int(id.item()-1)]["trajectory"].append(trajectory)
+                            final_f["people"][int(id.item()-1)]["trajectory"].append(traj)
 
                         id_text=f"{int(person['id'])}"
                         gender_text = f"Gender: {'M' if person['gender'] == 'Male' else 'F'}"
@@ -409,14 +411,15 @@ def my_track(video_path, tracker, show=False):
                         cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                     traj= 0
-            total_people= len(result)
-            cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-            for i in range (trajectory):
-                e=sum(1 for person in data["people"].values() if i+1 in person["trajectory"])
-                cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                total_people= len(result)
+                if box_x is not None:
+                    cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                for i in range (trajectory):
+                    e=sum(1 for person in data["people"].values() if i+1 in person["trajectory"])
+                    cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
             # Mostra il frame con i risultati
-            frame= cv2.resize(frame,(1280,720))
+            # frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -448,7 +451,7 @@ with open(file_path, 'w', encoding='utf-8') as file:
 
 print(final_f)
 final = classify(final_f)
-file_path = './src/Tracking/videos/results_cbam.json'
+file_path = './src/Tracking/videos/results.txt'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
