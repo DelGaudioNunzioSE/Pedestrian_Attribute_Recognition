@@ -348,7 +348,7 @@ def my_track(video_path, tracker, show=False):
 
 
 
-video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/Atrio_bright.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
