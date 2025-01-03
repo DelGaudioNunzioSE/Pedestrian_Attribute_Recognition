@@ -29,6 +29,7 @@ data = {
 probs = {"people": {}
 }
 
+MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
 
 
 
@@ -64,9 +65,9 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    #CLAHE(),
-    transforms.ToTensor(),
     transforms.Resize((224, 224)),
+    CLAHE(),
+    transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
@@ -118,7 +119,7 @@ def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
     recent_probs = np.array(recent_probs)  # Converte la lista in un array NumPy
-    recent_probs[recent_probs > 0.5] *= 1.5
+    recent_probs[recent_probs > 0.3] *= 2
     avg_prob = sum(recent_probs) / len(recent_probs)
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
@@ -215,7 +216,7 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention(hidden_dim=512)   
-    checkpoint = torch.load('./src/Classifier/Models/HistogramEqualization_512_neurons_7_01_0818.pth')
+    checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
@@ -225,7 +226,7 @@ def my_track(video_path, tracker, show=False):
 
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=2, conf=0.3
+                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
@@ -375,11 +376,7 @@ final = {
     "people" : []
 }
 
-<<<<<<< HEAD
-video_path = './src/Tracking/videos/Example.mp4' # Path to the input video file (`video_fish.mp4`)
-=======
-video_path = './src/Tracking/videos/Atrio_bright.mp4' # Path to the input video file (`video_fish.mp4`)
->>>>>>> 9f59eb32b9404e1343d98cfd2c13854ecb473b77
+video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 
@@ -398,7 +395,7 @@ with open(file_path, 'w', encoding='utf-8') as file:
 
 print(final_f)
 final = classify(final_f)
-file_path = './src/Tracking/videos/results_greco.json'
+file_path = './src/Tracking/videos/results_cbam.json'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")

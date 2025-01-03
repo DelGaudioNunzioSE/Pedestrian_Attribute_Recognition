@@ -31,39 +31,20 @@ class CNNWithAttention(nn.Module):
         super(CNNWithAttention, self).__init__()
 
         # ResNet Backbone
-        #resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
-        #if(channel == 'L'): # use black and white images <---
-        #    resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        #    print('Model: black and white mode')
-        #self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
-        #self.resnet_out_channels = 2048  # Per resnet18/34, resnet50 usa 2048    
-
-
-        # Carica ResNet-34 pre-addestrato
-        resnet = models.resnet34(weights=models.ResNet34_Weights.DEFAULT)
-
-        # Gestione delle immagini in bianco e nero (1 canale)
-        if channel == 'L':  # Se le immagini sono in scala di grigio
+        resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        if(channel == 'L'): # use black and white images <---
             resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
             print('Model: black and white mode')
-
-        # Rimuovi l'ultimo layer fully connected e la parte di pooling finale
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
-
-        # Uscita della rete, la dimensione di uscita per ResNet-34 è 512 (come ResNet-18)
-        self.resnet_out_channels = 512  # Per ResNet-34, l'output dei canali è 512
-
-
-
+        self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
+        self.proj = nn.Linear(2048, hidden_dim)
 
         #self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
         # Multi-head Attention Layer
-        self.cbam1 = CBAM(c1=self.resnet_out_channels)
-        self.cbam2 = CBAM(c1=self.resnet_out_channels)
-        self.cbam3 = CBAM(c1=self.resnet_out_channels)
-
-        #self.proj = nn.Linear(self.resnet_out_channels, hidden_dim)
+        self.attention1 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
+        self.attention2 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
+        self.attention3 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
 
         
         # Fully Connected Layer
@@ -85,23 +66,20 @@ class CNNWithAttention(nn.Module):
         # Passaggio attraverso la CNN (Backbone)
         x = self.backbone(x)             # [B, 256, H/8, W/8]
 
-        x1 = self.cbam1(x)
-        x2 = self.cbam2(x)
-        x3 = self.cbam3(x)
+        # Prepara l'input per il livello di attenzione
+        B, C, H, W = x.size()         # B = Batch size, C = 256, H = H/8, W = W/8
+        x = x.view(B, C, -1).permute(0, 2, 1)  # [B, H*W, 256]
+        x = self.proj(x)
 
-        # Pooling globale per ridurre le dimensioni spaziali
-        x1 = F.adaptive_avg_pool2d(x1, (1, 1))  # Global Average Pooling to (batch_size, 2048, 1, 1)
-        x1 = x1.view(x1.size(0), -1)  # Flatten to (batch_size, 2048)
+        # Attention layers
+        attn1, _= self.attention1(x, x, x)   # [B, H*W, 256]
+        attn2, _ = self.attention2(x, x, x)   # [B, H*W, 256]
+        attn3, _ = self.attention3(x, x, x)   # [B, H*W, 256]
+        
 
-        x2 = F.adaptive_avg_pool2d(x2, (1, 1))  # Global Average Pooling to (batch_size, 2048, 1, 1)
-        x2 = x2.view(x2.size(0), -1)  # Flatten to (batch_size, 2048)
-
-        x3 = F.adaptive_avg_pool2d(x3, (1, 1))  # Global Average Pooling to (batch_size, 2048, 1, 1)
-        x3 = x3.view(x3.size(0), -1)  # Flatten to (batch_size, 2048)
-
-        #x1 = self.proj(x1)  # [B, hidden_dim]
-        #x2 = self.proj(x2)  # [B, hidden_dim]
-        #x3 = self.proj(x3)  # [B, hidden_dim]
+        x1 = attn1.max(dim=1).values
+        x2 = attn2.max(dim=1).values
+        x3 = attn3.max(dim=1).values
 
 
         # Passaggio attraverso i fully connected layers
