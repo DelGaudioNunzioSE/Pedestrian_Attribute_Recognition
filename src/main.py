@@ -39,7 +39,7 @@ def main():
 
     # Parametri fissi
     s_w = 0.00498  # Larghezza sensore (m)
-    s_h = 0.003  # Altezza sensore (m)
+    s_h = 0.00374  # Altezza sensore (m)
     U = img.shape[1]   # Larghezza immagine (pixel)
     V = img.shape[0]  # Altezza immagine (pixel)
 

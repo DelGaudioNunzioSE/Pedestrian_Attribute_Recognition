@@ -36,30 +36,58 @@ class CNNWithAttention(nn.Module):
             resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
             print('Model: black and white mode')
         self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
+<<<<<<< HEAD
+        self.resnet_out_channels = 2048  # Per resnet18/34, resnet50 usa 2048    
+
+
+
+        #resnet = models.resnet34(weights=models.ResNet34_Weights.DEFAULT)
+
+
+        #if channel == 'L':  # Se le immagini sono in scala di grigio
+        #    resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        #    print('Model: black and white mode')
+
+
+        #self.backbone = nn.Sequential(*list(resnet.children())[:-2])  
+
+        #self.resnet_out_channels = 512  
+
+
+
+=======
         self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
         self.proj = nn.Linear(2048, hidden_dim)
+>>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
 
         #self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
         # Multi-head Attention Layer
+<<<<<<< HEAD
+        self.cbam1 = CBAM(c1=self.resnet_out_channels)
+        self.cbam2 = CBAM(c1=self.resnet_out_channels)
+        self.cbam3 = CBAM(c1=self.resnet_out_channels)
+
+=======
         self.attention1 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
         self.attention2 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
         self.attention3 = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=attention_heads, batch_first=True)
+>>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
 
         
         # Fully Connected Layer
-        self.fc1 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc2 = nn.Linear(hidden_dim, hidden_dim // 2)
-        self.fc3 = nn.Linear(hidden_dim, hidden_dim // 2)
+        self.fc1 = nn.Linear(self.resnet_out_channels, hidden_dim )
+        self.fc2 = nn.Linear(self.resnet_out_channels, hidden_dim )
+        self.fc3 = nn.Linear(self.resnet_out_channels, hidden_dim )
 
         # Classifier
-        self.classifier1 = nn.Linear(hidden_dim // 2, num_classes)
-        self.classifier2 = nn.Linear(hidden_dim // 2, num_classes)
-        self.classifier3 = nn.Linear(hidden_dim // 2, num_classes)
+        self.classifier1 = nn.Linear(hidden_dim , num_classes)
+        self.classifier2 = nn.Linear(hidden_dim , num_classes)
+        self.classifier3 = nn.Linear(hidden_dim , num_classes)
         
         # Activation and Dropout
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(0.2)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
@@ -77,23 +105,31 @@ class CNNWithAttention(nn.Module):
         attn3, _ = self.attention3(x, x, x)   # [B, H*W, 256]
         
 
+<<<<<<< HEAD
+        x2 = F.adaptive_avg_pool2d(x2, (1, 1))  # Global Average Pooling to (batch_size, 2048, 1, 1)
+        x2 = x2.view(x2.size(0), -1)  # Flatten to (batch_size, 2048)
+
+        x3 = F.adaptive_avg_pool2d(x3, (1, 1))  # Global Average Pooling to (batch_size, 2048, 1, 1)
+        x3 = x3.view(x3.size(0), -1)  # Flatten to (batch_size, 2048)
+=======
         x1 = attn1.max(dim=1).values
         x2 = attn2.max(dim=1).values
         x3 = attn3.max(dim=1).values
+>>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
 
 
         # Passaggio attraverso i fully connected layers
         x1 = self.fc1(x1)  # [B, hidden_dim // 2]
         x2 = self.fc2(x2)  # [B, hidden_dim // 2]
         x3 = self.fc3(x3)  # [B, hidden_dim // 2]
-        
-        x1 = self.relu(x1)
-        x2 = self.relu(x2)
-        x3 = self.relu(x3)
 
         x1 = self.dropout(x1)
         x2 = self.dropout(x2)
         x3 = self.dropout(x3)
+        
+        x1 = self.relu(x1)
+        x2 = self.relu(x2)
+        x3 = self.relu(x3)
 
         # Classifier
         out1 = self.classifier1(x1)  # [B, num_classes], num_classes perchè mi dà la probabilità

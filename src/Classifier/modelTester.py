@@ -14,10 +14,10 @@ from SupportScripts.device import device_selecter
 from SupportScripts.tester import Tester
 
 ## Parametri
-MODEL= 'HistogramEqualization_512_neurons_7_01_0818'
+MODEL= '_retray_4_try'
 HOMEMADE_PATH = None
 IMAGE_TYPE = 'RGB'
-BATCH_SIZE = int(32)
+BATCH_SIZE = int(64)
 Number_of_neurons = int(512)
 #############################
 
@@ -29,7 +29,7 @@ class HistogramEqualization:
 
 
 if IMAGE_TYPE == 'RGB':
-    transform = transforms.Compose([HistogramEqualization(),
+    transform = transforms.Compose([
                                     transforms.ToTensor(),
                                     transforms.Resize((224, 224)),
                                     transforms.Normalize([0.485, 0.456, 0.406],[0.229, 0.224, 0.225])
@@ -42,7 +42,7 @@ else:
                                 ])
 
 
-t = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+t = [0.3, 0.4, 0.5, 0.6, 0.7]
 CSV_TEST_FILE='./src/Classifier/Datasets/validation_set.csv'
 MODEL_PATH='./src/Classifier/Models/'+ MODEL +'.pth'
 data = pd.read_csv(CSV_TEST_FILE, sep=';')
