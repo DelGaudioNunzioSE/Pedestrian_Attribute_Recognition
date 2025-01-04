@@ -7,20 +7,20 @@ def main():
     print("Projection")
 
     # Lettura immagine con OpenCV
-    image_file = "src/Projection/imgs/test2.png"
+    image_file = "src/Projection/imgs/test1.png"
     img = cv2.imread(image_file)
 
 
 
     # Parametri per test1
-    x_real = np.array([-2.5, 0.5, 0.5, 4.6])
-    y_real = np.array([13.41, 8.00, 13.00, 10.91])
+    x_real = np.array([0.5, -2.5, 0.5, 4.6])
+    y_real = np.array([13, 13.40, 8, 10.91])
     z_real = np.zeros_like(x_real)
     xt= 0
     yt= 0
     zt= 7.20  # Coordinate della camera
     thyaw = 0* np.pi / 180  # Z
-    thpitch = (((360-32) * np.pi) / 180)  # X
+    thpitch = -0.558  # X
     throll = 0 * np.pi / 180  # Y
     f = 0.003  # Distanza focale (m)
 

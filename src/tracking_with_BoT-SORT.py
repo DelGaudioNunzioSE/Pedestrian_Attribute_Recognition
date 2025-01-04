@@ -10,6 +10,8 @@ from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
 
 from finalFile import * #per il file finale
+import time
+
 
 
 
@@ -84,11 +86,8 @@ transform = transforms.Compose([
 
 
 def calculate_crossing(box, box2, center, arrowEnd):
-    print(box, box2)
     vet_track = np.array([box2[2] - box[2], box2[3] - box[3]])
     vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
-    print(vet_track)
-    print(vet_line)
     dot_product = np.dot(vet_track, vet_line)
     if dot_product > 0:
         return True
@@ -187,7 +186,6 @@ def get_config(file_path):
         config["f"] = f_config["f"]
         config["s_w"] = f_config["sw"]
         config["s_h"] = f_config["sh"]
-        print(config)
     return config
            
 def getPoints(frame, config_path='./src/config/config.txt'):
@@ -287,13 +285,14 @@ def my_track(video_path, tracker, show=False):
 
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
-                          ,iou = 0.8, max_det=30, persist=True, half=True)
+                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=3, conf=0.3
+                          ,iou = 0.8, max_det=30, persist=True, half=True, device=device)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
     #1920x1080 riesce a prendersi il ragazzo dietro
     #ma forse possiamo usare 1280x720 e recuperarlo col detector
     #half migliora la velocità anche se abbassa un pò l'accuracy
+    #60 frames
 
 
     # Prendo image prima solo per disegnare le linee
@@ -304,8 +303,11 @@ def my_track(video_path, tracker, show=False):
     extra_width = 30  
     line_height = 20
     trajectory=(len(points)//2)
+
     for i,result in enumerate(results):
-        if i%2 == 0:
+        if i%5 == 0:
+            start_time = time.time()
+
             count_line=0
             frame = result.orig_img.copy()
             frame_original = result.orig_img  # Immagine originale del frame
@@ -440,9 +442,15 @@ def my_track(video_path, tracker, show=False):
                     e=sum(1 for person in data["people"].values() if i+1 in person["trajectory"])
                     cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
+
+
             # Mostra il frame con i risultati
             frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
+            end_time = time.time()  # Fine conteggio tempo
+            execution_time = end_time - start_time #150ms + 50ms = 200ms a frame, 5 fps. Elaboro 4 frame al secondo
+            print(execution_time)
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
