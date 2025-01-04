@@ -2,6 +2,8 @@
 
 import json
 
+import numpy as np
+
 from Projection.projectionFunctions import inversion_points
 
 config={
