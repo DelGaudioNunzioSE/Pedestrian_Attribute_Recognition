@@ -4,7 +4,7 @@ import json
 
 import numpy as np
 
-from Projection.projectionFunctions import inversion_points
+from Tracking.SupportScripts.Projection.projectionFunctions import inversion_points
 
 config={
     "x_real":[], #we have to inizialize in order to append the points

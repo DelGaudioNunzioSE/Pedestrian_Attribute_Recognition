@@ -335,7 +335,7 @@ video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 test_path='./src/Tracking/videos/Atrio.mp4'
-final_f = my_track(video_path, tracker, show)
+final_f = my_track(video_path, tracker)
 
 
 file_path = './src/Tracking/videos/probs.json'

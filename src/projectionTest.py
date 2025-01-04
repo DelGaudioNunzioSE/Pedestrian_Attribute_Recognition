@@ -7,7 +7,7 @@ def main():
     print("Projection")
 
     # Lettura immagine con OpenCV
-    image_file = "src/Projection/imgs/test2.png"
+    image_file = "src/Tracking/SupportScripts/Projection/imgs/test2.png"
     img = cv2.imread(image_file)
 
 

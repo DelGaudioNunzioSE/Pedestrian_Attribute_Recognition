@@ -99,8 +99,8 @@ def camera_to_plane(XYZ,focal, resolution_x, resolution_y, sensor_x, sensor_y):
 
     # Matrice di proiezione
     perspective_projection = np.array([
-        [fx, 0, ox, 0],
-        [0, -fx, oy, 0],
+        [fy, 0, ox, 0],
+        [0, fy, oy, 0],
         [0, 0, 1, 0]
     ])
 
