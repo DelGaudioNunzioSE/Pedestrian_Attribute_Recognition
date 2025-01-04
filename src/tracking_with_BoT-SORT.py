@@ -33,6 +33,10 @@ line_dict={
 probs = {"people": {}
 }
 
+lines ={
+    
+}
+
 MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
 
 
@@ -80,9 +84,11 @@ transform = transforms.Compose([
 
 
 def calculate_crossing(box, box2, center, arrowEnd):
-    
+    print(box, box2)
     vet_track = np.array([box2[2] - box[2], box2[3] - box[3]])
     vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
+    print(vet_track)
+    print(vet_line)
     dot_product = np.dot(vet_track, vet_line)
     if dot_product > 0:
         return True
@@ -98,8 +104,8 @@ def on_segment(p, q, r):
     return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
 
 def do_intersect(p1, q1, p2, q2):
-    x1,y1,x2,y2 = p1
-    x3,y3,x4,y4 = q1
+    x1,x2,y1,y2 = p1
+    x3,x4,y3,y4 = q1
     
     p1= ((x1+x2)/2,y2)
     q1= ((x3+x4)/2,y4)
@@ -134,7 +140,7 @@ def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.5, window_size=30):
+def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -154,35 +160,52 @@ def has_hat_peak(probabilities, threshold=0.3, window_size=30):
     return avg_prob > threshold
 
 
+config={
+    "x_real":[],
+    "y_real":[]
+}
 
 def get_config(file_path):
     with open(file_path, 'r') as f:
-        config = json.load(f)
-        config["x_real"] = (config["x_real"])
-        config["y_real"] = (config["y_real"])
-        config["z_real"] = np.zeros_like(config["x_real"])
-        config["thyaw"] = config["thyaw"] * np.pi / 180
-        config["thpitch"] = (360 - config["thpitch"]) * np.pi / 180
-        config["throll"] = config["throll"] * np.pi / 180
-    return config
+        f_config = json.load(f)
+        lines=f_config["lines"]                     #Per disegnare linee 
+        for line in f_config["lines"]:              #Per proiettare punti 
+            config["x_real"].append(line["x1"])
+            config["y_real"].append(line["y1"])
+            config["x_real"].append(line["x2"])
+            config["y_real"].append(line["y2"])
 
-def getPoints(frame, config_path='./src/config/config.json'):
+        config["z_real"] = np.zeros_like(config["x_real"])
+        config["xc"] = f_config["xc"]
+        config["yc"] = f_config["yc"]
+        config["zc"] = f_config["zc"]
+        config["thyaw"] = f_config["thyaw"] 
+        config["thpitch"] = f_config["thpitch"]
+        config["throll"] = f_config["throll"] 
+        config["U"] = f_config["U"]  # Larghezza immagine (pixel)
+        config["V"] = f_config["V"]  # Altezza immagine (pixel)
+        config["f"] = f_config["f"]
+        config["s_w"] = f_config["sw"]
+        config["s_h"] = f_config["sh"]
+        print(config)
+    return config
+           
+def getPoints(frame, config_path='./src/config/config.txt'):
     config = get_config(config_path)
-    U = frame.shape[1]  # Larghezza immagine (pixel)
-    V = frame.shape[0]  # Altezza immagine (pixel)
+
     return inversion_points(
         x_real=config["x_real"],
         y_real=config["y_real"],
         z_real = config["z_real"],
-        camera_x=config["xt"],
-        camera_y=config["yt"],
-        camera_z=config["zt"],
+        camera_x=config["xc"],
+        camera_y=config["yc"],
+        camera_z=config["zc"],
         thyaw=config["thyaw"],
         thpitch=config["thpitch"],
         throll=config["throll"],
         focal=config["f"],
-        resolution_x=U,
-        resolution_y=V,
+        resolution_x=config["U"],
+        resolution_y=config["V"],
         sensor_x=config["s_w"],
         sensor_y=config["s_h"]
     )
@@ -291,7 +314,6 @@ def my_track(video_path, tracker, show=False):
             for j in range(0, len(points) - 1, 2):  # Itera con passi di 2
                 count_line+=1
                 frame = drawLine(frame,points[j],points[j+1], count_line)
-                
             # Itera su ogni bounding box e ID
             if result.boxes.xyxy is not None and result.boxes.id is not None:
                 for box, id in zip(result.boxes.xyxy, result.boxes.id):
@@ -334,7 +356,7 @@ def my_track(video_path, tracker, show=False):
                         "hat": hat_pred.item(),
                         "bag": bag_pred.item(),
                         "trajectory": [],
-                        "xyxy":(x1,y1,x2,y2)
+                        "xyxy":(x1,x2,y1,y2)
                     }
                     if new_person["id"] in data["people"]:
                         # Aggiorna la persona esistente
@@ -419,7 +441,7 @@ def my_track(video_path, tracker, show=False):
                     cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
             # Mostra il frame con i risultati
-            # frame= cv2.resize(frame,(1280,720))
+            frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
