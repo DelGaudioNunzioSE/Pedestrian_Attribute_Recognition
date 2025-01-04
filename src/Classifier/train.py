@@ -1,4 +1,6 @@
 from datetime import datetime
+import cv2
+import numpy as np
 import torch 
 import torch.nn as nn 
 import torch.optim as optim 
@@ -27,15 +29,14 @@ STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
 LEARNING_COMMENT = '_repropose'
-NUMBER_OF_NEURONS=int(512/2) 
-DEBUG = False
+NUMBER_OF_NEURONS=int(512) 
 TIMESTAMP = False
 MODEL_PATH=None # if you wanto to start from a previous model
 
 # Nunzio's
 REORDER=True # Nunzio's reorder
 IMAGE_TYPE='RGB' # RGB or L balck and white
-HOMEMADE_IMGE_PATH = None
+HOMEMADE_IMGE_PATH = None # if we do a pre-image processing in another folder
 
 # Paths
 CSV_TRAINING_FILE='./src/Classifier/Datasets/training_set.csv'
@@ -44,7 +45,7 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = int(256/2) #Reduce if you have GPU's memory problems
+BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.0001
 NUM_EPOCHS = 15
@@ -62,6 +63,16 @@ class HistogramEqualization:
             raise TypeError("Input is not PIL.Image")
         return ImageOps.equalize(img)
 
+class CLAHE:
+    def __init__(self):
+        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    
+    def __call__(self, img):
+        img = np.array(img)
+        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        img_clahe = self.clahe.apply(img_gray)
+        img_rgb = cv2.cvtColor(img_clahe, cv2.COLOR_GRAY2RGB)
+        return Image.fromarray(img_rgb)
 
 
 ##### DATA AUGMENTATION ######################################
@@ -72,13 +83,14 @@ if IMAGE_TYPE=='RGB':
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
         transforms.RandomRotation(degrees=(-5, 5)),
-        HistogramEqualization(),
+        CLAHE(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
     VAL_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),
+        CLAHE(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -103,7 +115,7 @@ else:
 if(REORDER==True):
     rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
     DATASET_SIZE=rcsv.erase_invalid_row()
-    CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
+    rcsv.print_new_csv()
 
 
 # Reading new dataset
@@ -115,16 +127,6 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=VAL_TRANSFORMS, train=Tr
 
 
 
-
-# Change class weight
-#if CLASS_WEIGHTS == True:
-#    class_weights = calculate_class_weights(dataset_train)
-#    sampler = WeightedRandomSampler(class_weights, len(dataset_train))
-#else:
-#    sampler = RandomSampler(dataset_train)
-#    valid_sampler = SequentialSampler(dataset_valid)
-
-
 #Dataset
 data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE) #batch di train
 data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
@@ -132,47 +134,34 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
 
 
 
-##### MODELLO ######################################
+##### MODEL ######################################
 ####################################################
 # Model creation
 model = CNNWithAttention(channel=IMAGE_TYPE, hidden_dim=NUMBER_OF_NEURONS)   
 model.to(DEVICE)
 
-def init_weights(m):
-    if isinstance(m, nn.Linear):
-        torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
-
-model.apply(init_weights)
 
 if MODEL_PATH != None:
     checkpoint = torch.load(MODEL_PATH)
     model.load_state_dict(checkpoint['model_state_dict'])
 
-# model = models.vgg16(pretrained=True)
-# for param in model.parameters():
-#     param.requires_grad = False
-
-# Usa il sigmoide all'interno, quindi non c'è bisogno di usarlo nella rete neurale
-# E' più stabile di sigmoide seguito da BCE.
-# criterion = nn.BCEWithLogitsLoss() #ottengo la loss per ogni campione
 
 
-# Optimizer
-# Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
+# Optimizer and scheduler
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-#scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
-scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
+scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
+#scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
 ###########################################################
 
 
 
 print('Datatrain dimension:', len(data_train)*BATCH_SIZE) # len(data_train) = batch number
-# VALIDATOR
-validator=Tester(data_valid, POS_WEIGHT_GENDER, POS_WEIGHT_BAG, POS_WEIGHT_HAT)
+
+validator=Tester(data_valid, POS_WEIGHT_GENDER, POS_WEIGHT_BAG, POS_WEIGHT_HAT)#  VALIDATOR
 
 
 
+###############################################
 # TRAINING LOOP  ##########################################
 
 for epoch in range(NUM_EPOCHS):
@@ -201,11 +190,6 @@ for epoch in range(NUM_EPOCHS):
 
         total_training_loss += loss.item()
 
-        if(DEBUG==True):
-                print('sono alla ', i)
-                print('la loss gender è:', loss_gender.item(), 'labels:', labels[:,0])
-                print('la loss bag è:', loss_bag.item(), 'labels:',  labels[:,1])
-                print( 'la loss hat è:', loss_hat.item(), 'labels:',    labels[:,2])	
         print(f'Loss for {i}° batch over', len(data_train),'for',epoch,'epoch', 'is:', loss.item())
 
 
@@ -217,7 +201,7 @@ for epoch in range(NUM_EPOCHS):
     # Validation
     if (VALIDATION == True):
         validator.test(model,GENDER_LOSS_WEIGHT, BAG_LOSS_WEIGHT,HAT_LOSS_WEIGHT)
-        validator.plot(LEARNING_COMMENT)
+        validator.plot(LEARNING_COMMENT) # save the plot
 
 
 

@@ -4,7 +4,7 @@ import torch
 from SupportScripts.adjustedLoss import adjustedLoss, total_loss_fuction
 from SupportScripts.device import device_selecter
 
-
+# This class is used to test the model, in the validation and test phase
 
 
 
@@ -48,13 +48,13 @@ class Tester:
 
 
     
-    def tpfpfn(self, pred,labels):
+    def _tpfpfn(self, pred,labels):
         tp = ((pred == 1) & (labels.unsqueeze(1) == 1)).sum().item()
         fp = ((pred == 1) & (labels.unsqueeze(1) == 0)).sum().item()
         fn = ((pred == 0) & (labels.unsqueeze(1) == 1)).sum().item()
         return tp,fp,fn
     
-    def fscore(self,tp,fp,fn):
+    def _fscore(self,tp,fp,fn):
         precision = tp / (tp + fp + 1e-8)
         recall_gender = tp / (tp + fn + 1e-8)
         f1 = 2 * (precision * recall_gender) / (precision + recall_gender + 1e-8)
@@ -62,10 +62,13 @@ class Tester:
 
 
     def test(self,model,gender_weight=1,bag_weight=1,hat_weight=1,t=0.5):
-        # model = CNNWithAttention() 
-        # model.to(self.device)
-        # checkpoint = torch.load(model_path)
-        # model.load_state_dict(checkpoint['model_state_dict'])
+        '''
+        model: model to test (loaded)
+        gender_weight: weight of gender loss
+        bag_weight: weight of bag loss
+        hat_weight: weight of hat loss
+        t: threshold for the prediction
+        '''
 
 
         model.eval()  # Imposta il modello in modalità valutazione
@@ -103,18 +106,18 @@ class Tester:
                 #Calcola l'accuratezza per ciascun output
                 gender_pred = torch.sigmoid(gender) > t
                 accuracy_gender = (gender_pred.float() == labels[:, 0].unsqueeze(1)).float().mean()
-                tp_gender, fp_gender, fn_gender = self.tpfpfn(gender_pred,labels[:,0])
-                fgender = self.fscore(tp_gender, fp_gender, fn_gender)
+                tp_gender, fp_gender, fn_gender = self._tpfpfn(gender_pred,labels[:,0])
+                fgender = self._fscore(tp_gender, fp_gender, fn_gender)
 
                 bag_pred = torch.sigmoid(bag) > t
                 accuracy_bag = (bag_pred.float() == labels[:, 1].unsqueeze(1)).float().mean()
-                tp_bag, fp_bag, fn_bag = self.tpfpfn(bag_pred,labels[:,1])
-                fbag = self.fscore(tp_bag, fp_bag, fn_bag)
+                tp_bag, fp_bag, fn_bag = self._tpfpfn(bag_pred,labels[:,1])
+                fbag = self._fscore(tp_bag, fp_bag, fn_bag)
 
                 hat_pred = torch.sigmoid(hat) > t
                 accuracy_hat = (hat_pred.float() == labels[:, 2].unsqueeze(1)).float().mean()
-                tp_hat, fp_hat, fn_hat = self.tpfpfn(hat_pred,labels[:,2])
-                fhat = self.fscore(tp_hat, fp_hat, fn_hat)
+                tp_hat, fp_hat, fn_hat = self._tpfpfn(hat_pred,labels[:,2])
+                fhat = self._fscore(tp_hat, fp_hat, fn_hat)
 
 
                 val_acc_gender += accuracy_gender.item()
@@ -142,9 +145,9 @@ class Tester:
         val_acc_bag /= total_samples
 
 
-        fgender = self.fscore(tp_gender_tot, fp_gender_tot, fn_gender_tot)
-        fhat = self.fscore(tp_hat_tot, fp_hat_tot, fn_hat_tot)
-        fbag = self.fscore(tp_bag_tot, fp_bag_tot, fn_bag_tot)
+        fgender = self._fscore(tp_gender_tot, fp_gender_tot, fn_gender_tot)
+        fhat = self._fscore(tp_hat_tot, fp_hat_tot, fn_hat_tot)
+        fbag = self._fscore(tp_bag_tot, fp_bag_tot, fn_bag_tot)
 
         # Salvo i valori di validazione per ogni epoca
         self.val_losses_tot.append(val_loss)
@@ -163,14 +166,19 @@ class Tester:
         print(f"Tp (Gender): {tp_gender_tot:.4f}, Fp (Gender): {fp_gender_tot:.4f}, Fn (Gender): {fn_gender_tot}")
         print(f"Tp (Hat): {tp_hat_tot:.4f}, Fp (Hat): {fp_hat_tot:.4f}, Fn (hat): {fn_hat_tot}")
         print(f"Tp (Bag): {tp_bag_tot:.4f}, Fp (Bag): {fp_bag_tot:.4f}, Fn (Bag): {fn_bag_tot}")
-        print(f"Fscore (Gender): {fgender:.2f}, Fscore (Hat): {fhat:.2f}, Fbag (Bag): {fbag}")
+        print(f"_Fscore (Gender): {fgender:.2f}, _Fscore (Hat): {fhat:.2f}, Fbag (Bag): {fbag}")
         print("Threshold: ",t)
         print("Total Validation Samples: ", len(self.data_test) * self.batch_size)
 
 
 
 
+
+
     def plot(self, plots_name=None):
+        '''
+        plots_name: name of the plots
+        '''
 
         if plots_name is None:
             plots_name = 'try'
