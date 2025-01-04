@@ -26,8 +26,8 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = '_retray'
-NUMBER_OF_NEURONS=int(512) 
+LEARNING_COMMENT = '_repropose'
+NUMBER_OF_NEURONS=int(512/2) 
 DEBUG = False
 TIMESTAMP = False
 MODEL_PATH=None # if you wanto to start from a previous model
@@ -44,10 +44,10 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
+BATCH_SIZE = int(256/2) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
 LEARNING_RATE = 0.0001
-NUM_EPOCHS = 10
+NUM_EPOCHS = 15
 GENDER_LOSS_WEIGHT = 0.3
 BAG_LOSS_WEIGHT = 0.4
 HAT_LOSS_WEIGHT = 0.3
@@ -59,7 +59,7 @@ POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE)
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
-            raise TypeError("Input deve essere un'immagine PIL.Image")
+            raise TypeError("Input is not PIL.Image")
         return ImageOps.equalize(img)
 
 
@@ -70,8 +70,9 @@ if IMAGE_TYPE=='RGB':
     print('Image type is RGB')
     TRAIN_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
-        transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
-        transforms.RandomRotation(degrees=(-10, 10)),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
+        transforms.RandomRotation(degrees=(-5, 5)),
+        HistogramEqualization(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
@@ -160,8 +161,8 @@ if MODEL_PATH != None:
 # Optimizer
 # Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
-#scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
+#scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
+scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
 ###########################################################
 
 

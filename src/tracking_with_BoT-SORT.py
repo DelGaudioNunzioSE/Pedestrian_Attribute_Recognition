@@ -33,7 +33,7 @@ line_dict={
 probs = {"people": {}
 }
 
-MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
+MODEL = "_retray_2_try.pth"
 
 
 
@@ -69,12 +69,9 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-<<<<<<< HEAD
-=======
-    #transforms.Resize((90, 200)),
+    transforms.Resize((90, 200)),
     transforms.Resize((224, 224)),
-    CLAHE(),
->>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
+    #CLAHE(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -129,7 +126,7 @@ def do_intersect(p1, q1, p2, q2):
 
 
     
-def has_gender_peak(probabilities, threshold=0.5, window_size=1):
+def has_gender_peak(probabilities, threshold=0.4, window_size=2):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -137,12 +134,8 @@ def has_gender_peak(probabilities, threshold=0.5, window_size=1):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-<<<<<<< HEAD
-def has_bag_peak(probabilities, threshold=0.5, window_size=1, peak_threshold=0.8):
-=======
-def has_bag_peak(probabilities, threshold=0.5, window_size=30):
+def has_bag_peak(probabilities, threshold=0.5, window_size=2):
     # Considera solo le ultime N predizioni
->>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
     recent_probs = np.array(recent_probs)  # Converte la lista in un array NumPy
@@ -152,11 +145,7 @@ def has_bag_peak(probabilities, threshold=0.5, window_size=30):
     return avg_prob > threshold
 
     
-<<<<<<< HEAD
-def has_hat_peak(probabilities, threshold=0.5, window_size=1):
-=======
-def has_hat_peak(probabilities, threshold=0.3, window_size=30):
->>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
+def has_hat_peak(probabilities, threshold=0.5, window_size=2):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -265,11 +254,7 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention(hidden_dim=512)   
-<<<<<<< HEAD
-    checkpoint = torch.load('./src/Classifier/Models/_BIGGEST_weight_4_try.pth')
-=======
     checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
->>>>>>> 62fed7f62a65d7396efb7f6741920af39b394d0c
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
@@ -470,7 +455,3 @@ file_path = './src/Tracking/videos/results.txt'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
-
-
-
-
