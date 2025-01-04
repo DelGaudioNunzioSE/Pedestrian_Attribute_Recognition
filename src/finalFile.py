@@ -23,7 +23,7 @@ def classify_gender(final_file):
     for person in final_file["people"]:
         male_count = 0
         female_count = 0
-        if "gender" in person:
+        if person is not None and "gender" in person and person["gender"] is not None:
             # Itera su ogni valore nella lista "gender"
             for gender in person["gender"]:
                 if gender == "Male":
@@ -57,7 +57,8 @@ def classify_bag(final_file):
         no_count = 0
         if "bag" in person:
             # Itera su ogni valore nella lista "bag"
-            for bag in person["bag"]:
+            len_bag = int(len(person["bag"])/2)
+            for bag in person["bag"][len_bag-5:len_bag+5]:
                 if bag == "Yes":
                     yes_count += 1
                 elif bag == "No":
