@@ -32,12 +32,15 @@ class CNNWithAttention(nn.Module):
 
         # ResNet Backbone
         resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+
         if(channel == 'L'): # use black and white images <---
             resnet.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
             print('Model: black and white mode')
-        self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # Rimuove l'ultimo FC e la pool
-        self.resnet_out_channels = 512  # Per resnet18/34, resnet50 usa 2048    
-        self.proj = nn.Linear(2048, hidden_dim)
+
+        self.backbone = nn.Sequential(*list(resnet.children())[:-2])  # remove FC e la pool
+
+        self.resnet_out_channels = 2048  #  
+        self.proj = nn.Linear(self.resnet_out_channels, hidden_dim)
 
         #self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
 
@@ -62,12 +65,14 @@ class CNNWithAttention(nn.Module):
         self.dropout = nn.Dropout(0.3)
         self.sigmoid = nn.Sigmoid()
 
+
+
     def forward(self, x):
         # Passaggio attraverso la CNN (Backbone)
         x = self.backbone(x)             # [B, 256, H/8, W/8]
 
         # Prepara l'input per il livello di attenzione
-        B, C, H, W = x.size()         # B = Batch size, C = 256, H = H/8, W = W/8
+        B, C, _, _ = x.size()         # B = Batch size, C = 256, H = H/8, W = W/8
         x = x.view(B, C, -1).permute(0, 2, 1)  # [B, H*W, 256]
         x = self.proj(x)
 

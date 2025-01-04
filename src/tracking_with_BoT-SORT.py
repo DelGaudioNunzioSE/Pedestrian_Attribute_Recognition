@@ -1,33 +1,33 @@
 import math
 import cv2
+import numpy as np
 import torch
 from ultralytics import YOLO  # Ensure you have the Ultralytics YOLO library installed
-import os
 import json
 from torchvision import transforms
 from Classifier.classifier import CNNWithAttention
 from PIL import Image, ImageOps
-from Projection.projectionFunctions import *
 
 from finalFile import * #per il file finale
-import time
+
+# our imports
+from Tracking.SupportScripts.init import init
+from Tracking.SupportScripts.crossingDirection import calculate_crossing
+from Tracking.SupportScripts.crossing import do_intersect#, orientation, on_segment
+from Tracking.SupportScripts.configurationReading import getPoints
+from Tracking.SupportScripts.drowLine import drawLine, line_dict
 
 
 
 
-# path_corrente = os.getcwd()
-# print(f"Il path corrente è: {path_corrente}")
 
-#dataset
-# Struttura dei dati
+# Database forma
 data = {
-    "people": {},  # Dizionario con ID come chiavi e dati della persona come valori
+    "people": {},  # Dictionary with ID keys e dati della persona come valori
     "trajectory":[]
 }
 
-line_dict={
-    "line":{}
-}
+
 
 probs = {"people": {}
 }
@@ -40,14 +40,13 @@ MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
 
 
 
-
+####TRANSFORMS#######################################
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
             raise TypeError("Input deve essere un'immagine PIL.Image")
         return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
-
     
 class CLAHE:
     def __init__(self):
@@ -69,54 +68,7 @@ transform = transforms.Compose([
 ])
 
 
-
-
-def calculate_crossing(box, box2, center, arrowEnd):
-    vet_track = np.array([box2[1] - box[1], box2[3] - box[3]])
-    vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
-    dot_product = np.dot(vet_track, vet_line)
-    if dot_product > 0:
-        return True
-    else: 
-        return False
-    
-# Funzione per calcolare l'orientamento (cross product) di tre punti
-def orientation(p, q, r):
-    return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
-
-# Funzione per verificare se due segmenti si intersecano
-def on_segment(p, q, r):
-    return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
-
-def do_intersect(p1, q1, p2, q2):
-    x1,x2,y1,y2 = p1
-    x3,x4,y3,y4 = q1
-    
-    p1= ((x1+x2)/2,y2)
-    q1= ((x3+x4)/2,y4)
-
-
-    # Calcolare le 4 orientazioni
-    o1 = orientation(p1, q1, p2)
-    o2 = orientation(p1, q1, q2)
-    o3 = orientation(p2, q2, p1)
-    o4 = orientation(p2, q2, q1)
-    # Generale caso
-    if o1 * o2 < 0 and o3 * o4 < 0:
-        return True
-    # Controllo collineare
-    if o1 == 0 and on_segment(p1, p2, q1):
-        return True
-    if o2 == 0 and on_segment(p1, q2, q1):
-        return True
-    if o3 == 0 and on_segment(p2, p1, q2):
-        return True
-    if o4 == 0 and on_segment(p2, q1, q2):
-        return True
-    return False
-
-
-    
+#Christian hack###########################################################
 def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
@@ -145,104 +97,15 @@ def has_hat_peak(probabilities, threshold=0.3, window_size=30):
     return avg_prob > threshold
 
 
-config={
-    "x_real":[],
-    "y_real":[]
-}
-
-def get_config(file_path):
-    with open(file_path, 'r') as f:
-        f_config = json.load(f)
-        lines=f_config["lines"]                     #Per disegnare linee 
-        for line in f_config["lines"]:              #Per proiettare punti 
-            config["x_real"].append(line["x1"])
-            config["y_real"].append(line["y1"])
-            config["x_real"].append(line["x2"])
-            config["y_real"].append(line["y2"])
-
-        config["z_real"] = np.zeros_like(config["x_real"])
-        config["xc"] = f_config["xc"]
-        config["yc"] = f_config["yc"]
-        config["zc"] = f_config["zc"]
-        config["thyaw"] = f_config["thyaw"] 
-        config["thpitch"] = f_config["thpitch"]
-        config["throll"] = f_config["throll"] 
-        config["U"] = f_config["U"]  # Larghezza immagine (pixel)
-        config["V"] = f_config["V"]  # Altezza immagine (pixel)
-        config["f"] = f_config["f"]
-        config["s_w"] = f_config["sw"]
-        config["s_h"] = f_config["sh"]
-        print(config)
-    return config, lines
-           
-def getPoints(config_path='./src/config/config.json'):
-    config,lines = get_config(config_path)
-
-    return inversion_points(
-        x_real=config["x_real"],
-        y_real=config["y_real"],
-        z_real = config["z_real"],
-        camera_x=config["xc"],
-        camera_y=config["yc"],
-        camera_z=config["zc"],
-        thyaw=config["thyaw"],
-        thpitch=config["thpitch"],
-        throll=config["throll"],
-        focal=config["f"],
-        resolution_x=config["U"],
-        resolution_y=config["V"],
-        sensor_x=config["s_w"],
-        sensor_y=config["s_h"]
-    ), lines
+#####
 
 
-def drawLine(frame,p1,p2, i):
-    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=3)  # Cerchi rossi
-    cx = (p1[0] + p2[0]) // 2
-    cy = (p1[1] + p2[1]) // 2
-    dx = p1[0] - p2[0]
-    dy = p1[1] - p2[1]
-
-    length = np.sqrt(dx**2 + dy**2) 
-    unit_dx = dx / length
-    unit_dy = dy / length
-
-    perp_dx = -unit_dy
-    perp_dy = unit_dx
-    arrowEnd=(int(cx+perp_dx*25),int(cy+perp_dy*25))
-    cv2.circle(frame, p1 , 3,(0, 0, 255), thickness=3)
-    cv2.circle(frame, p2 , 3,(0, 0, 255), thickness=3)
-    cv2.arrowedLine(frame, (cx, cy), arrowEnd, (255, 0, 0), thickness=3)
-    if(p1[0]<p2[0]):
-        cv2.putText(frame, str(i),(p1[0],p1[1]-25),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
-    else:
-        cv2.putText(frame, str(i),(p2[0],p2[1]-25),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
-    new_line = {        "id": i,
-                        "p1": p1,
-                        "p2": p2,
-                        "center": (cx,cy),
-                        "arrowEnd": arrowEnd
-                    }
-    line_dict["line"][new_line["id"]]= new_line
-    return frame
-
-def histo(img_rgb):
-        r, g, b = cv2.split(img_rgb)
-
-        # Equalizzazione dell'istogramma per ciascun canale
-        r_equalized = cv2.equalizeHist(r)
-        g_equalized = cv2.equalizeHist(g)
-        b_equalized = cv2.equalizeHist(b)
-
-        # Ricompone l'immagine a colori con i canali equalizzati
-        img_equalized = cv2.merge([r_equalized, g_equalized, b_equalized])
-
-        # Converti l'immagine back a BGR per il salvataggio
-        img_equalized_bgr = cv2.cvtColor(img_equalized, cv2.COLOR_RGB2BGR)
-
-        return img_equalized_bgr
-
-def drawBox(box, frame,device):
+def classifier_preparer(box, frame, device):
+    '''prepare the input for the classifier
+        box-> the bounding box of the person
+        frame-> the frame of the video
+        device-> the device to use
+    '''
     x1, y1, x2, y2 = map(int, box[:4])
     # Ritaglia il bounding box dall'immagine
     cropped_img = frame[y1:y2, x1:x2]
@@ -250,9 +113,12 @@ def drawBox(box, frame,device):
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
     cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
+####################################################################################
 
 
-def my_track(video_path, tracker, show=False):
+
+# the main function (video processing)
+def my_track(video_path, tracker):
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -275,8 +141,21 @@ def my_track(video_path, tracker, show=False):
     print(f"The model is loaded on: {next(model.parameters()).device}")
 
     # Run tracking with the specified tracker configuration file
-    results = model.track(source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1280,1920), vid_stride=8, conf=0.3
+    # verbose -> False to suppress the output
+    # source -> Path to the input video file
+    # show -> True to display the processed video with tracked objects (we use cv2.imshow)
+    # tracker -> Path to the tracker configuration file (`botsort.yaml`)
+    # stream -> True to display the results in real-time (True= don't wait the end of the video to show the results)
+    # classes -> 0 track only person
+    # imgsz -> Image size (pixels)
+    # vid_stride -> Frame stride for video (how many frames to skip)
+    # conf -> Object confidence threshold (you have tohigher to be a valid deteced object)
+    # iou -> IOU threshold for NMS (Non-Maximum Suppression) (you have to lower to be a valid deteced object) (it takes the most confident one)
+    # max_det -> Maximum number of detections per image
+    # persist -> True to keep tracking between frames (afther desappear and reappear the object must mantain the same ID)
+    # half -> True to use half precision (faster but less accurate)
+    results = model.track(device = device, verbose= False, source=video_path, show=False, tracker=tracker, 
+                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
@@ -296,20 +175,24 @@ def my_track(video_path, tracker, show=False):
 
     extra_width = 30  
     line_height = 20
-    trajectory=(len(points)//2)
+    trajectory=(len(points)//2) #number of lines
+
+    # Iteration on the detector frames
     for i,result in enumerate(results):
         if(i%2==0):
             frame = result.orig_img.copy()
-            frame_original = result.orig_img  # Immagine originale del frame
+            frame_original = result.orig_img  #origin frame without box
             traj=0
             
             for j,line in enumerate(lines):  # Itera con passi di 2
                 frame = drawLine(frame,points[2*j],points[2*j+1], line["id"])
+
             # Itera su ogni bounding box e ID
             if result.boxes.xyxy is not None and result.boxes.id is not None:
+                # Interation on evry box
                 for box, id in zip(result.boxes.xyxy, result.boxes.id):
                     x1, y1, x2, y2 = map(int, box)  # Bounding box coordinates
-                    img = drawBox(box, frame_original,device)  # Prepara input per la rete di classificazione
+                    img = classifier_preparer(box, frame_original, device)  # Prepara input per la rete di classificazione
                     x1_extended = x1 - extra_width  # Aggiungi margine a sinistra
                     x2_extended = x2 + extra_width  # Aggiungi margine a destra
                     # Classificazioni (gender, hat, bag)
@@ -330,13 +213,15 @@ def my_track(video_path, tracker, show=False):
                     # Disegna il bounding box sul frame
                     
                     box_x, box_y, box_width, box_height = 10, 10, 250, 33*(trajectory+1)  
-                    cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1)
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2) # qua disegna i bounding_box
-                    cv2.rectangle(frame,(x1,y1),(x1+20,y1+20),(255,255,255),-1)
-                    text_box_height = 70
+                    cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1) # on the dop
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2) # drow the bouinding box
+                    cv2.rectangle(frame,(x1,y1),(x1+20,y1+20),(255,255,255),-1) # id
+
                     x1_extended = max(x1_extended, 0)
                     x2_extended = min(x2_extended, frame.shape[1])
-                    cv2.rectangle(frame, (x1_extended, y2), (x2_extended, y2 + text_box_height), (255, 255, 255), -1)  # Box bianco
+                    cv2.rectangle(frame, (x1_extended, y2), (x2_extended, y2 + 70), (255, 255, 255), -1)  # undre the box
+
+                    #for each person check if it is crossing a line
                     if(id.item() in data["people"]):
                         person=data["people"][id.item()]
                         for line in lines:
@@ -358,8 +243,8 @@ def my_track(video_path, tracker, show=False):
                         "trajectory": [],
                         "xyxy":(x1,x2,y1,y2)
                     }
+                    # if the person is already in the data
                     if new_person["id"] in data["people"]:
-                        # Aggiorna la persona esistente
                         person = data["people"][new_person["id"]]
                         person["gender"] = new_person["gender"]
                         person["hat"] = new_person["hat"]
@@ -382,10 +267,10 @@ def my_track(video_path, tracker, show=False):
                         hat_pred = "Yes" if has_hat_peak(prs["hat_pred"]) else "No"
                         person["hat"] = hat_pred
 
+                        # for the final file
                         final_f = append(final_f, int(id.item()), gender_pred, bag_pred, hat_pred)
 
-                        # Aggiungi la nuova traiettoria
-                        
+                        # add a new person's trajectory (if the person is crossing a new line)
                         if(len(person["trajectory"])>0):
                             if(person["trajectory"][-1]!=traj and traj!=0):
                                 person["trajectory"].append(traj)
@@ -394,6 +279,7 @@ def my_track(video_path, tracker, show=False):
                             person["trajectory"].append(traj)
                             final_f["people"][int(id.item()-1)]["trajectory"].append(traj)
 
+                        # lable insie the box in the video
                         id_text=f"{int(person['id'])}"
                         gender_text = f"Gender: {'M' if person['gender'] == 'Male' else 'F'}"
                         hat_bag_text = f"Hat: {'Yes' if person['hat'] == 'Yes' else 'No'} | Bag: {'Yes' if person['bag'] == 'Yes' else 'No'}"
@@ -406,6 +292,7 @@ def my_track(video_path, tracker, show=False):
                         cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
 
+                    # if the person is not in the data
                     else:
                         final_f = init(final, int(id.item())) #file finale
                         data["people"][new_person["id"]] = new_person
@@ -435,8 +322,11 @@ def my_track(video_path, tracker, show=False):
                     
                     traj= 0
                 total_people= len(result)
+
+                # counting box on the top left of the video
                 if box_x is not None:
                     cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                
                 for i,line in enumerate(lines):
                     id=line["id"]
                     e=sum(1 for person in data["people"].values() if id in person["trajectory"])
@@ -460,13 +350,8 @@ video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 test_path='./src/Tracking/videos/Atrio.mp4'
-final_f = my_track(video_path, tracker, show)
+final_f = my_track(video_path, tracker)
 
-# Scrittura del file JSON
-file_path = './src/Tracking/videos/data.json'
-with open(file_path, 'w', encoding='utf-8') as file:
-    json.dump(data, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
-    print(f"File salvato in {file_path}")
 
 file_path = './src/Tracking/videos/probs.json'
 with open(file_path, 'w', encoding='utf-8') as file:
@@ -479,7 +364,3 @@ file_path = './src/Tracking/videos/results.txt'
 with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(final, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
-
-
-
-
