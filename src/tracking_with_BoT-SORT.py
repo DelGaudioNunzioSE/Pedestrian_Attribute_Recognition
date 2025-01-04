@@ -10,8 +10,7 @@ from PIL import Image, ImageOps
 from Projection.projectionFunctions import *
 
 from finalFile import * #per il file finale
-
-
+import time
 
 
 
@@ -48,18 +47,7 @@ class HistogramEqualization:
             raise TypeError("Input deve essere un'immagine PIL.Image")
         return ImageOps.equalize(img)
 #Dall'immagine del bounding box all'input della rete
-    
-def init(data, id):
-    prs={"id" : id,
-    "gender" : [],
-    "bag" : [],
-    "hat" : [],
-    "trajectory" : []
-    }
-    while len(data["people"]) < id:
-        data["people"].append(None)
-    data["people"][id-1] = prs
-    return data
+
     
 class CLAHE:
     def __init__(self):
@@ -84,7 +72,7 @@ transform = transforms.Compose([
 
 
 def calculate_crossing(box, box2, center, arrowEnd):
-    vet_track = np.array([box2[2] - box[2], box2[3] - box[3]])
+    vet_track = np.array([box2[1] - box[1], box2[3] - box[3]])
     vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
     dot_product = np.dot(vet_track, vet_line)
     if dot_product > 0:
@@ -187,7 +175,7 @@ def get_config(file_path):
         print(config)
     return config, lines
            
-def getPoints(frame, config_path='./src/config/config.json'):
+def getPoints(config_path='./src/config/config.json'):
     config,lines = get_config(config_path)
 
     return inversion_points(
@@ -222,6 +210,8 @@ def drawLine(frame,p1,p2, i):
     perp_dx = -unit_dy
     perp_dy = unit_dx
     arrowEnd=(int(cx+perp_dx*25),int(cy+perp_dy*25))
+    cv2.circle(frame, p1 , 3,(0, 0, 255), thickness=3)
+    cv2.circle(frame, p2 , 3,(0, 0, 255), thickness=3)
     cv2.arrowedLine(frame, (cx, cy), arrowEnd, (255, 0, 0), thickness=3)
     if(p1[0]<p2[0]):
         cv2.putText(frame, str(i),(p1[0],p1[1]-25),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
@@ -286,7 +276,7 @@ def my_track(video_path, tracker, show=False):
 
     # Run tracking with the specified tracker configuration file
     results = model.track(source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
+                          stream=True, classes=0, imgsz = (1280,1920), vid_stride=8, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
@@ -296,17 +286,19 @@ def my_track(video_path, tracker, show=False):
 
 
     # Prendo image prima solo per disegnare le linee
-    image=next(results)
-    frame=image.orig_img
     
-    points,lines=getPoints(frame)
     
+    points,lines=getPoints()
+    
+    gender={}
+    hat={}
+    bag={}
+
     extra_width = 30  
     line_height = 20
     trajectory=(len(points)//2)
     for i,result in enumerate(results):
-        if i%2 == 0:
-            count_line=0
+        if(i%2==0):
             frame = result.orig_img.copy()
             frame_original = result.orig_img  # Immagine originale del frame
             traj=0
@@ -320,14 +312,23 @@ def my_track(video_path, tracker, show=False):
                     img = drawBox(box, frame_original,device)  # Prepara input per la rete di classificazione
                     x1_extended = x1 - extra_width  # Aggiungi margine a sinistra
                     x2_extended = x2 + extra_width  # Aggiungi margine a destra
-                    
                     # Classificazioni (gender, hat, bag)
-                    gender, bag, hat = classifier_model(img)
-                    gender_pred = torch.sigmoid(gender)  #0.4
-                    hat_pred = torch.sigmoid(hat)  
-                    bag_pred = torch.sigmoid(bag) #0.3
-                    # Disegna il bounding box sul frame
+                    #(vid stride 8/ 2 primo if/ 5 secondo if) 71 sec
+                    #(vid stride 8/ 2 primo if/ 5 secondo if) 76 sec
+                    if(i%3==0):
+                        gender[id.item()], bag[id.item()], hat[id.item()] = classifier_model(img)
+                    if(id.item() in gender):
+                        gender_pred = torch.sigmoid(gender[id.item()])  #0.4
+                        hat_pred = torch.sigmoid(hat[id.item()])
+                        bag_pred = torch.sigmoid(bag[id.item()]) #0.3
+                    else:
+                        gender_pred = torch.sigmoid(torch.tensor(0))  #0.4
+                        hat_pred = torch.sigmoid(torch.tensor(0))
+                        bag_pred = torch.sigmoid(torch.tensor(0)) #0.3
 
+                   
+                    # Disegna il bounding box sul frame
+                    
                     box_x, box_y, box_width, box_height = 10, 10, 250, 33*(trajectory+1)  
                     cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1)
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2) # qua disegna i bounding_box
@@ -342,11 +343,11 @@ def my_track(video_path, tracker, show=False):
                             if(do_intersect(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["p1"],line_dict["line"][line["id"]]["p2"])):
                                 if(calculate_crossing(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["center"],line_dict["line"][line["id"]]["arrowEnd"])):
                                     traj=line["id"]
-                                        
+                       
 
                     
                             
-                            
+                           
                     # Crea un dizionario con le informazioni
                     
                     new_person = {
@@ -366,10 +367,10 @@ def my_track(video_path, tracker, show=False):
                         person["xyxy"] = new_person["xyxy"]
 
                         prs = probs["people"][new_person["id"]]
-
-                        prs["gender_pred"].append(new_person["gender"])
-                        prs["bag_pred"].append(new_person["bag"])
-                        prs["hat_pred"].append(new_person["hat"])
+                        if(prs["gender_pred"][-1]!= new_person["gender"]):
+                            prs["gender_pred"].append(new_person["gender"])
+                            prs["bag_pred"].append(new_person["bag"])
+                            prs["hat_pred"].append(new_person["hat"])
 
             
                         bag_pred = "Yes" if has_bag_peak(prs["bag_pred"]) else "No"
@@ -431,6 +432,7 @@ def my_track(video_path, tracker, show=False):
                         cv2.putText(frame, gender_text, (x1_extended, y2 + line_height), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, hat_bag_text, (x1_extended, y2 + line_height * 2), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
                         cv2.putText(frame, trajectory_text, (x1_extended, y2 + line_height * 3), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 0), 1)
+                    
                     traj= 0
                 total_people= len(result)
                 if box_x is not None:
@@ -439,7 +441,7 @@ def my_track(video_path, tracker, show=False):
                     id=line["id"]
                     e=sum(1 for person in data["people"].values() if id in person["trajectory"])
                     cv2.putText(frame, f"Trajectory {id}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-
+                
             # Mostra il frame con i risultati
             frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
