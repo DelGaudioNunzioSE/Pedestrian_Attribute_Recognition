@@ -33,7 +33,11 @@ line_dict={
 probs = {"people": {}
 }
 
-MODEL = "_retray_2_try.pth"
+lines ={
+    
+}
+
+MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
 
 
 
@@ -69,9 +73,9 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    transforms.Resize((90, 200)),
+    #transforms.Resize((90, 200)),
     transforms.Resize((224, 224)),
-    #CLAHE(),
+    CLAHE(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -80,7 +84,6 @@ transform = transforms.Compose([
 
 
 def calculate_crossing(box, box2, center, arrowEnd):
-    
     vet_track = np.array([box2[2] - box[2], box2[3] - box[3]])
     vet_line = np.array([arrowEnd[0] - center[0], arrowEnd[1] - center[1]])
     dot_product = np.dot(vet_track, vet_line)
@@ -98,8 +101,8 @@ def on_segment(p, q, r):
     return min(p[0], r[0]) <= q[0] <= max(p[0], r[0]) and min(p[1], r[1]) <= q[1] <= max(p[1], r[1])
 
 def do_intersect(p1, q1, p2, q2):
-    x1,y1,x2,y2 = p1
-    x3,y3,x4,y4 = q1
+    x1,x2,y1,y2 = p1
+    x3,x4,y3,y4 = q1
     
     p1= ((x1+x2)/2,y2)
     q1= ((x3+x4)/2,y4)
@@ -126,7 +129,7 @@ def do_intersect(p1, q1, p2, q2):
 
 
     
-def has_gender_peak(probabilities, threshold=0.4, window_size=2):
+def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -134,7 +137,7 @@ def has_gender_peak(probabilities, threshold=0.4, window_size=2):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.5, window_size=2):
+def has_bag_peak(probabilities, threshold=0.5, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -145,7 +148,7 @@ def has_bag_peak(probabilities, threshold=0.5, window_size=2):
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.5, window_size=2):
+def has_hat_peak(probabilities, threshold=0.3, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -154,42 +157,59 @@ def has_hat_peak(probabilities, threshold=0.5, window_size=2):
     return avg_prob > threshold
 
 
+config={
+    "x_real":[],
+    "y_real":[]
+}
 
 def get_config(file_path):
     with open(file_path, 'r') as f:
-        config = json.load(f)
-        config["x_real"] = (config["x_real"])
-        config["y_real"] = (config["y_real"])
-        config["z_real"] = np.zeros_like(config["x_real"])
-        config["thyaw"] = config["thyaw"] * np.pi / 180
-        config["thpitch"] = (360 - config["thpitch"]) * np.pi / 180
-        config["throll"] = config["throll"] * np.pi / 180
-    return config
+        f_config = json.load(f)
+        lines=f_config["lines"]                     #Per disegnare linee 
+        for line in f_config["lines"]:              #Per proiettare punti 
+            config["x_real"].append(line["x1"])
+            config["y_real"].append(line["y1"])
+            config["x_real"].append(line["x2"])
+            config["y_real"].append(line["y2"])
 
+        config["z_real"] = np.zeros_like(config["x_real"])
+        config["xc"] = f_config["xc"]
+        config["yc"] = f_config["yc"]
+        config["zc"] = f_config["zc"]
+        config["thyaw"] = f_config["thyaw"] 
+        config["thpitch"] = f_config["thpitch"]
+        config["throll"] = f_config["throll"] 
+        config["U"] = f_config["U"]  # Larghezza immagine (pixel)
+        config["V"] = f_config["V"]  # Altezza immagine (pixel)
+        config["f"] = f_config["f"]
+        config["s_w"] = f_config["sw"]
+        config["s_h"] = f_config["sh"]
+        print(config)
+    return config, lines
+           
 def getPoints(frame, config_path='./src/config/config.json'):
-    config = get_config(config_path)
-    U = frame.shape[1]  # Larghezza immagine (pixel)
-    V = frame.shape[0]  # Altezza immagine (pixel)
+    config,lines = get_config(config_path)
+
     return inversion_points(
         x_real=config["x_real"],
         y_real=config["y_real"],
         z_real = config["z_real"],
-        camera_x=config["xt"],
-        camera_y=config["yt"],
-        camera_z=config["zt"],
+        camera_x=config["xc"],
+        camera_y=config["yc"],
+        camera_z=config["zc"],
         thyaw=config["thyaw"],
         thpitch=config["thpitch"],
         throll=config["throll"],
         focal=config["f"],
-        resolution_x=U,
-        resolution_y=V,
+        resolution_x=config["U"],
+        resolution_y=config["V"],
         sensor_x=config["s_w"],
         sensor_y=config["s_h"]
-    )
+    ), lines
 
 
 def drawLine(frame,p1,p2, i):
-    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=1)  # Cerchi rossi
+    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=3)  # Cerchi rossi
     cx = (p1[0] + p2[0]) // 2
     cy = (p1[1] + p2[1]) // 2
     dx = p1[0] - p2[0]
@@ -202,9 +222,11 @@ def drawLine(frame,p1,p2, i):
     perp_dx = -unit_dy
     perp_dy = unit_dx
     arrowEnd=(int(cx+perp_dx*25),int(cy+perp_dy*25))
-    cv2.arrowedLine(frame, (cx, cy), arrowEnd, (255, 0, 0), thickness=2)
-
-    cv2.putText(frame, str(i),(p1[0],p1[1]+15),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
+    cv2.arrowedLine(frame, (cx, cy), arrowEnd, (255, 0, 0), thickness=3)
+    if(p1[0]<p2[0]):
+        cv2.putText(frame, str(i),(p1[0],p1[1]-25),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
+    else:
+        cv2.putText(frame, str(i),(p2[0],p2[1]-25),cv2.FONT_HERSHEY_SIMPLEX,2,(255,0,0),3)
     new_line = {        "id": i,
                         "p1": p1,
                         "p2": p2,
@@ -277,7 +299,8 @@ def my_track(video_path, tracker, show=False):
     image=next(results)
     frame=image.orig_img
     
-    points=getPoints(frame)
+    points,lines=getPoints(frame)
+    
     extra_width = 30  
     line_height = 20
     trajectory=(len(points)//2)
@@ -288,10 +311,8 @@ def my_track(video_path, tracker, show=False):
             frame_original = result.orig_img  # Immagine originale del frame
             traj=0
             
-            for j in range(0, len(points) - 1, 2):  # Itera con passi di 2
-                count_line+=1
-                frame = drawLine(frame,points[j],points[j+1], count_line)
-                
+            for j,line in enumerate(lines):  # Itera con passi di 2
+                frame = drawLine(frame,points[2*j],points[2*j+1], line["id"])
             # Itera su ogni bounding box e ID
             if result.boxes.xyxy is not None and result.boxes.id is not None:
                 for box, id in zip(result.boxes.xyxy, result.boxes.id):
@@ -299,7 +320,7 @@ def my_track(video_path, tracker, show=False):
                     img = drawBox(box, frame_original,device)  # Prepara input per la rete di classificazione
                     x1_extended = x1 - extra_width  # Aggiungi margine a sinistra
                     x2_extended = x2 + extra_width  # Aggiungi margine a destra
-
+                    
                     # Classificazioni (gender, hat, bag)
                     gender, bag, hat = classifier_model(img)
                     gender_pred = torch.sigmoid(gender)  #0.4
@@ -317,10 +338,10 @@ def my_track(video_path, tracker, show=False):
                     cv2.rectangle(frame, (x1_extended, y2), (x2_extended, y2 + text_box_height), (255, 255, 255), -1)  # Box bianco
                     if(id.item() in data["people"]):
                         person=data["people"][id.item()]
-                        for k in range(trajectory):
-                            if(do_intersect(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][k+1]["p1"],line_dict["line"][k+1]["p2"])):
-                                if(calculate_crossing(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][k+1]["center"],line_dict["line"][k+1]["arrowEnd"])):
-                                    traj=k+1
+                        for line in lines:
+                            if(do_intersect(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["p1"],line_dict["line"][line["id"]]["p2"])):
+                                if(calculate_crossing(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["center"],line_dict["line"][line["id"]]["arrowEnd"])):
+                                    traj=line["id"]
                                         
 
                     
@@ -334,7 +355,7 @@ def my_track(video_path, tracker, show=False):
                         "hat": hat_pred.item(),
                         "bag": bag_pred.item(),
                         "trajectory": [],
-                        "xyxy":(x1,y1,x2,y2)
+                        "xyxy":(x1,x2,y1,y2)
                     }
                     if new_person["id"] in data["people"]:
                         # Aggiorna la persona esistente
@@ -414,12 +435,13 @@ def my_track(video_path, tracker, show=False):
                 total_people= len(result)
                 if box_x is not None:
                     cv2.putText(frame, f"Total People: {total_people}", (box_x + 10, box_y + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
-                for i in range (trajectory):
-                    e=sum(1 for person in data["people"].values() if i+1 in person["trajectory"])
-                    cv2.putText(frame, f"Trajectory {i+1}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+                for i,line in enumerate(lines):
+                    id=line["id"]
+                    e=sum(1 for person in data["people"].values() if id in person["trajectory"])
+                    cv2.putText(frame, f"Trajectory {id}: {e}", (box_x + 10, box_y + 30*(i+2)), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
             # Mostra il frame con i risultati
-            # frame= cv2.resize(frame,(1280,720))
+            frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
@@ -435,7 +457,7 @@ final = {
 video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
-
+test_path='./src/Tracking/videos/Atrio.mp4'
 final_f = my_track(video_path, tracker, show)
 
 # Scrittura del file JSON
