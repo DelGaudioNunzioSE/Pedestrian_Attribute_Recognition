@@ -20,17 +20,15 @@ from classifier import CNNWithAttention
 from SupportScripts.adjustedLoss import adjustedLoss, total_loss_fuction
 from SupportScripts.tester import Tester
 from SupportScripts.device import device_selecter
-from SupportScripts.calculateClassWeights import calculate_class_weights
 
 # auto information
 DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = '_BIGGEST'
-NUMBER_OF_NEURONS=int(512)
+LEARNING_COMMENT = '_retray'
+NUMBER_OF_NEURONS=int(512) 
 DEBUG = False
-CLASS_WEIGHTS = False
 TIMESTAMP = False
 MODEL_PATH=None # if you wanto to start from a previous model
 
@@ -46,13 +44,13 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 # Learning parameters
 VALIDATION = True # if we have to compute validaton too
 
-BATCH_SIZE = int(128*2) #Reduce if you have GPU's memory problems
+BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
-LEARNING_RATE = 0.00001
-NUM_EPOCHS = 20
-GENDER_LOSS_WEIGHT = 3
-BAG_LOSS_WEIGHT = 5
-HAT_LOSS_WEIGHT = 2
+LEARNING_RATE = 0.0001
+NUM_EPOCHS = 10
+GENDER_LOSS_WEIGHT = 0.3
+BAG_LOSS_WEIGHT = 0.4
+HAT_LOSS_WEIGHT = 0.3
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
@@ -73,8 +71,8 @@ if IMAGE_TYPE=='RGB':
     TRAIN_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
         transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+        transforms.RandomRotation(degrees=(-10, 10)),
         transforms.ToTensor(),
-        transforms.RandomErasing(p=0.3, scale=(0.02, 0.33), ratio=(2.2, 3.5)), # occlusion
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
@@ -101,9 +99,10 @@ else:
 ##### DATASET ######################################
 ####################################################
 
-# rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
-# DATASET_SIZE=rcsv.erase_invalid_row()
-# CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
+if(REORDER==True):
+    rcsv=reorderCSV(BATCH_SIZE=BATCH_SIZE ,FILE_PATH=CSV_TRAINING_FILE, NEW_FILE_PATH=CSV_NEW_TRAINING_FILE)
+    DATASET_SIZE=rcsv.erase_invalid_row()
+    CSV_TRAINING_FILE=CSV_NEW_TRAINING_FILE
 
 
 # Reading new dataset
@@ -117,17 +116,17 @@ dataset_valid = CSVDataset(csv_file=val_data, transform=VAL_TRANSFORMS, train=Tr
 
 
 # Change class weight
-if CLASS_WEIGHTS == True:
-    class_weights = calculate_class_weights(dataset_train)
-    sampler = WeightedRandomSampler(class_weights, len(dataset_train))
-else:
-    sampler = RandomSampler(dataset_train)
-    valid_sampler = SequentialSampler(dataset_valid)
+#if CLASS_WEIGHTS == True:
+#    class_weights = calculate_class_weights(dataset_train)
+#    sampler = WeightedRandomSampler(class_weights, len(dataset_train))
+#else:
+#    sampler = RandomSampler(dataset_train)
+#    valid_sampler = SequentialSampler(dataset_valid)
 
 
 #Dataset
-data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE, sampler=sampler) #batch di train
-data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE, sampler=valid_sampler)
+data_train = DataLoader(dataset_train,batch_size=BATCH_SIZE) #batch di train
+data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
 
 
 
@@ -161,8 +160,8 @@ if MODEL_PATH != None:
 # Optimizer
 # Scheduler che riduce il learning rate ogni 10 epoche di un fattore di 0.1
 optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
-#scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
-scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
+scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=NUM_EPOCHS) # Christian's
+#scheduler = CyclicLR(optimizer, base_lr=LEARNING_RATE, max_lr=(LEARNING_RATE*10), step_size_up=NUM_EPOCHS/2, mode='triangular') # Nunzio's
 ###########################################################
 
 

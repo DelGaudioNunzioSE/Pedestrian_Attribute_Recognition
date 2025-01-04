@@ -64,7 +64,6 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    CLAHE(),
     transforms.ToTensor(),
     transforms.Resize((224, 224)),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -105,7 +104,7 @@ def do_intersect(p1, q1, p2, q2):
 
 
     
-def has_gender_peak(probabilities, threshold=0.6, window_size=20):
+def has_gender_peak(probabilities, threshold=0.5, window_size=1):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -113,7 +112,7 @@ def has_gender_peak(probabilities, threshold=0.6, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.4, window_size=20, peak_threshold=0.8):
+def has_bag_peak(probabilities, threshold=0.5, window_size=1, peak_threshold=0.8):
     recent_probs = probabilities[-window_size:]
     avg_prob = sum(recent_probs) / len(recent_probs)
     max_prob = max(recent_probs)
@@ -121,7 +120,7 @@ def has_bag_peak(probabilities, threshold=0.4, window_size=20, peak_threshold=0.
     return avg_prob > threshold or max_prob > peak_threshold
 
     
-def has_hat_peak(probabilities, threshold=0.4, window_size=10):
+def has_hat_peak(probabilities, threshold=0.5, window_size=1):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -212,7 +211,7 @@ def my_track(video_path, tracker, show=False):
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
     classifier_model = CNNWithAttention(hidden_dim=512)   
-    checkpoint = torch.load('./src/Classifier/Models/HistogramEqualization_512_neurons_7_01_0818.pth')
+    checkpoint = torch.load('./src/Classifier/Models/_BIGGEST_weight_4_try.pth')
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
