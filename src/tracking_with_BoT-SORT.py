@@ -326,7 +326,7 @@ def my_track(video_path, tracker):
             frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
             end_time = time.time()  # Fine conteggio tempo
-            execution_time = end_time #150ms + 50ms = 200ms a frame, 5 fps. Elaboro 4 frame al secondo
+            execution_time = end_time  #150ms + 50ms = 200ms a frame, 5 fps. Elaboro 4 frame al secondo
             print(execution_time)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
