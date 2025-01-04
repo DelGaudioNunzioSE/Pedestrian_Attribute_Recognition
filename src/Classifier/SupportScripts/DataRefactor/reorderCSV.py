@@ -26,7 +26,7 @@ class reorderCSV():
         return None, None  # if the row is not found
     
 
-    def create_balanced_batches(self):
+    def _create_balanced_batches(self):
         # Separazione delle classi per ciascuna colonna
         class_0_col2 = self.dataset[self.dataset[:, 1] == 0]
         class_1_col2 = self.dataset[self.dataset[:, 1] == 1]
@@ -83,7 +83,7 @@ class reorderCSV():
             class_1_col4 = class_1_col4[third_batch:]
 
     
-    def create_batches(self):
+    def _create_batches(self):
 
         while len(self.dataset) >= self.BATCH_SIZE:
 
@@ -115,14 +115,14 @@ class reorderCSV():
 
 
     def print_new_csv(self):
-        self.create_batches() 
+        self._create_batches() 
         new_csv= pd.DataFrame(self.new_dataset)
         new_csv.to_csv(self.NEW_FILE_PATH, sep=';', index=False, header=False)
         return new_csv.shape[0] # Return the number of rows in the new csv
     
 
     def print_belanced_new_csv(self):
-        self.create_balanced_batches()
+        self._create_balanced_batches()
         new_csv = pd.DataFrame(self.new_dataset)
         new_csv.to_csv(self.NEW_FILE_PATH, sep=';', index=False, header=False)
         print(f"Balanced dataset saved to {self.NEW_FILE_PATH}")

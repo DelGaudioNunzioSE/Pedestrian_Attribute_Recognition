@@ -27,11 +27,4 @@ This repository represents our collective effort to excel in the competition and
 - Video Analysis 📹
 - Software Engineering 💻
 
-## Stay Tuned 🚀
-
-Follow our progress as we develop the pipeline step by step. Your feedback and suggestions are always welcome!
-
----
-
-**Let's make this project a success! 💪**
 
