@@ -35,7 +35,6 @@ def get_config(file_path):
         config["f"] = f_config["f"]
         config["s_w"] = f_config["sw"]
         config["s_h"] = f_config["sh"]
-        print(config)
     return config, lines
            
 def getPoints(config_path='./src/config/config.txt'):

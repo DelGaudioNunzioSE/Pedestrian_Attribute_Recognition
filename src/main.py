@@ -65,7 +65,6 @@ class CLAHE:
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
-    
     CLAHE(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -91,7 +90,7 @@ def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.4, window_size=20):
+def has_hat_peak(probabilities, threshold=0.3, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -124,13 +123,15 @@ def fps(video_path):
         print("Errore nell'apertura del video.")
     else:
         fps = cap.get(cv2.CAP_PROP_FPS)
-        print(f"FPS del video: {fps:.2f}")
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"Fps video: {fps:.2f}, widht: {width}, height: {height}")
     cap.release()
     if fps < 35:
         skip = 2
     else:
         skip = 4
-    return skip
+    return skip,width,height
 ####################################################################################
 
 
@@ -155,6 +156,7 @@ def my_track(video_path, tracker):
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
     classifier_model.to(device)
+    skip,width,height = fps(video_path)
 
     # Confirm the device of the model
     print(f"The model is loaded on: {next(model.parameters()).device}")
@@ -175,7 +177,7 @@ def my_track(video_path, tracker):
     # half -> True to use half precision (faster but less accurate)
     
     results = model.track(device = device, verbose= False, source=video_path, show=False, tracker=tracker, 
-                          stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
+                          stream=True, classes=0, imgsz = (height,width), vid_stride=7, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
     
     #video, visualizza mentre elabora, parametri del tracker, stream = risultati in tempo reale
@@ -189,7 +191,6 @@ def my_track(video_path, tracker):
     
     
     points,lines=getPoints()
-    skip = fps(video_path)
     
     gender={}
     hat={}
@@ -382,7 +383,7 @@ final = {
     "people" : []
 }
 
-video_path = './src/Tracking/videos/video.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/video1.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 #test_path='./src/Tracking/videos/Atrio.mp4'
