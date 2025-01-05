@@ -18,7 +18,7 @@ from Tracking.SupportScripts.crossingDirection import calculate_crossing
 from Tracking.SupportScripts.crossing import do_intersect#, orientation, on_segment
 from Tracking.SupportScripts.configurationReading import getPoints
 from Tracking.SupportScripts.drowLine import drawLine, line_dict
-from Classifier.classifierTest import CNNWithAttention2
+from Classifier.classifier import CNNWithAttention
 
 
 
@@ -39,7 +39,7 @@ lines ={
     
 }
 
-MODEL = "_aaaaaa_10_try.pth"
+MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
 
 
 
@@ -63,8 +63,8 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    #transforms.Resize((90, 200)),
     transforms.Resize((224, 224)),
+    
     CLAHE(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -90,7 +90,7 @@ def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.5, window_size=20):
+def has_hat_peak(probabilities, threshold=0.4, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -149,7 +149,7 @@ def my_track(video_path, tracker):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention2(hidden_dim=512)   
+    classifier_model = CNNWithAttention(hidden_dim=512)   
     checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
@@ -234,9 +234,9 @@ def my_track(video_path, tracker):
                         hat_pred = torch.sigmoid(hat[id.item()])
                         bag_pred = torch.sigmoid(bag[id.item()]) #0.3
                     else:
-                        gender_pred = torch.sigmoid(torch.tensor(0))  #0.4
-                        hat_pred = torch.sigmoid(torch.tensor(0))
-                        bag_pred = torch.sigmoid(torch.tensor(0)) #0.3
+                        gender_pred = torch.tensor(0.2)  #0.4
+                        hat_pred = torch.tensor(0.2)
+                        bag_pred = torch.tensor(0.2)
                     
 
                    
@@ -381,7 +381,7 @@ final = {
     "people" : []
 }
 
-video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/video.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 #test_path='./src/Tracking/videos/Atrio.mp4'
