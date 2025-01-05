@@ -25,16 +25,12 @@ from SupportScripts.device import device_selecter
 
 # auto information
 DEVICE=device_selecter()
-STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = '_7ciriprovo'
-NUMBER_OF_NEURONS=int(512/2) 
+LEARNING_COMMENT = '_aaaaaa'
 TIMESTAMP = False
 MODEL_PATH=None # if you wanto to start from a previous model
-
-# Nunzio's
-REORDER=True # Nunzio's reorder
+REORDER=True # Dataset reorder
 IMAGE_TYPE='RGB' # RGB or L balck and white
 HOMEMADE_IMGE_PATH = None # if we do a pre-image processing in another folder
 
@@ -46,17 +42,17 @@ CSV_NEW_TRAINING_FILE='./src/Classifier/Datasets/new_training_set.csv'
 VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
-VALIDATION_SIZE = 0.1
+VALIDATION_SIZE = 0.2
 LEARNING_RATE = 0.00001
 NUM_EPOCHS = 15
-GENDER_LOSS_WEIGHT = 0.3
-BAG_LOSS_WEIGHT = 0.4
-HAT_LOSS_WEIGHT = 0.3
+GENDER_LOSS_WEIGHT = 1
+BAG_LOSS_WEIGHT = 1
+HAT_LOSS_WEIGHT = 1
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
 POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
 
-#########################################################################################
+##### DATA AUGMENTATION ######################################
 class HistogramEqualization:
     def __call__(self, img):
         if not isinstance(img, Image.Image):
@@ -75,22 +71,20 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 
-##### DATA AUGMENTATION ######################################
-####################################################
 if IMAGE_TYPE=='RGB':
     print('Image type is RGB')
     TRAIN_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
         transforms.RandomRotation(degrees=(-5, 5)),
-        #CLAHE(),
+        HistogramEqualization(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
     VAL_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),
-        #CLAHE(), # to simulate the same 'normalization'
+        HistogramEqualization(), # to simulate the same 'normalization'
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])

@@ -37,7 +37,7 @@ lines ={
     
 }
 
-MODEL = "_ciriprovo_1_try.pth"
+MODEL = "_aaaaaa_10_try.pth"
 
 
 
@@ -70,7 +70,7 @@ transform = transforms.Compose([
 
 
 #Christian hack###########################################################
-def has_gender_peak(probabilities, threshold=0.35, window_size=20):
+def has_gender_peak(probabilities, threshold=0.5, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -78,7 +78,7 @@ def has_gender_peak(probabilities, threshold=0.35, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.5, window_size=30):
+def has_bag_peak(probabilities, threshold=0.6, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -89,7 +89,7 @@ def has_bag_peak(probabilities, threshold=0.5, window_size=30):
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.5, window_size=30):
+def has_hat_peak(probabilities, threshold=0.5, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -132,7 +132,7 @@ def my_track(video_path, tracker):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention2()   
+    classifier_model = CNNWithAttention2(hidden_dim=512)   
     checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
