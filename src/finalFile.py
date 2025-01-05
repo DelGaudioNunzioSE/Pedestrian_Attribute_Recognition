@@ -58,7 +58,7 @@ def classify_bag(final_file):
         if "bag" in person:
             # Itera su ogni valore nella lista "bag"
             len_bag = int(len(person["bag"])/2)
-            for bag in person["bag"][len_bag-5:len_bag+5]:
+            for bag in person["bag"]:
                 if bag == "Yes":
                     yes_count += 1
                 elif bag == "No":
