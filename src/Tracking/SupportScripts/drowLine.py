@@ -13,7 +13,7 @@ def drawLine(frame,p1,p2, i):
     i-> id line
     '''
     # drow the line
-    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=3)  # Cerchi rossi
+    cv2.line(frame, p1,p2, color=(255, 0, 0), thickness=3) 
     cx = (p1[0] + p2[0]) // 2
     cy = (p1[1] + p2[1]) // 2
     dx = p1[0] - p2[0]

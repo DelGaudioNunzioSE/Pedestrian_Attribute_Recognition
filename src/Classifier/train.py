@@ -18,7 +18,7 @@ from torch.optim.lr_scheduler import CyclicLR
 
 # OUR IMPORTS
 from SupportScripts.checkpoint import checkpoint_fuction
-from classifierTest import CNNWithAttention2
+from classifier import CNNWithAttention
 from SupportScripts.adjustedLoss import adjustedLoss, total_loss_fuction
 from SupportScripts.tester import Tester
 from SupportScripts.device import device_selecter
@@ -43,14 +43,14 @@ VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.2
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.0001
 NUM_EPOCHS = 15
 GENDER_LOSS_WEIGHT = 1
 BAG_LOSS_WEIGHT = 1
 HAT_LOSS_WEIGHT = 1
 POS_WEIGHT_GENDER = torch.tensor([61000/24000], device=DEVICE) # 24000 1 61000 0
 POS_WEIGHT_BAG  = torch.tensor([55168/10516], device=DEVICE)
-POS_WEIGHT_HAT  = torch.tensor([(68629/14811)], device=DEVICE) 
+POS_WEIGHT_HAT  = torch.tensor([(68629/9642)], device=DEVICE) 
 
 ##### DATA AUGMENTATION ######################################
 class HistogramEqualization:
@@ -131,7 +131,7 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
 ##### MODEL ######################################
 ####################################################
 # Model creation
-model = CNNWithAttention2()   
+model = CNNWithAttention()   
 model.to(DEVICE)
 
 

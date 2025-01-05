@@ -32,7 +32,6 @@ def classify_gender(final_file):
                 elif gender == "Female":
                     female_count += 1
         dominant_gender = "Male" if male_count > female_count else "Female"
-        print(person["id"])
         person["gender"] = dominant_gender  # Sostituisci il valore con "Male" o "Female"
     return final_file
 

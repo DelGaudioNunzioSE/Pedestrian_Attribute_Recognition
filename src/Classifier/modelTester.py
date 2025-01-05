@@ -14,7 +14,7 @@ from SupportScripts.device import device_selecter
 from SupportScripts.tester import Tester
 
 ## Parametri
-MODEL= '_retray_4_try'
+MODEL= 'HistogramEqualization_512_neurons_7_01_0818'
 HOMEMADE_PATH = None
 IMAGE_TYPE = 'RGB'
 BATCH_SIZE = int(64)

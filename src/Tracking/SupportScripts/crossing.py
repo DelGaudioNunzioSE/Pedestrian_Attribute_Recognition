@@ -7,7 +7,7 @@ def orientation(p, q, r):
     '''
     return (q[1] - p[1]) * (r[0] - q[0]) - (q[0] - p[0]) * (r[1] - q[1])
 
-# Funzione per verificare se due segmenti si intersecano
+
 def on_segment(p, q, r):
     '''
     check if the point q is in the middle of the segment formed by the p and r points

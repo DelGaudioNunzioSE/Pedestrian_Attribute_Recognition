@@ -1,4 +1,4 @@
-# CHRISTIAN
+
 def init(data, id):
     prs={"id" : id,
     "gender" : [],

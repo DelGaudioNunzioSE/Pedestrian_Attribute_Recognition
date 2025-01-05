@@ -48,7 +48,7 @@ Contains all files related to pedestrian detection and tracking:
 1. Ensure that the **camera configuration** and **crossing line definitions** are correctly set up in the `config/` folder.
 2. Run the main script `mian.py` to start the system.
 ### Classifier
-- use src/Classifier/train.py in order to train
+- use src/Classifier/train.py in order to train (remember to specify the path of the dataset or inserti into src/Classifier/Datasets/ as foulder)
 - use src/Classifier/modelTester.py in order to test a model
 
 

@@ -21,7 +21,7 @@ from Tracking.SupportScripts.drowLine import drawLine, line_dict
 from Classifier.classifier import CNNWithAttention
 
 
-
+video_path = './src/Tracking/videos/video_test.mp4' # Path to the input video file (`video_fish.mp4`)
 
 
 # Database forma
@@ -62,6 +62,7 @@ class CLAHE:
         img_clahe = self.clahe.apply(img_gray)
         img_rgb = cv2.cvtColor(img_clahe, cv2.COLOR_GRAY2RGB)
         return Image.fromarray(img_rgb)
+
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -383,7 +384,7 @@ final = {
     "people" : []
 }
 
-video_path = './src/Tracking/videos/video1.mp4' # Path to the input video file (`video_fish.mp4`)
+
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 #test_path='./src/Tracking/videos/Atrio.mp4'

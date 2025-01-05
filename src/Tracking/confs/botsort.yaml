@@ -7,9 +7,9 @@ gmc_method: None # global motion compesation
 match_thresh: 0.85 # minimum similarity value for matching #0.65 aiuta per quello seduto, 0,75, 0.80
 
 new_track_thresh: 0.85 # confidencte of Blob_high to start a new track
-track_buffer: 60 # number of frames to keep a track alive #100 
+track_buffer: 20  #number of frames to keep a track alive #100 
 
 track_high_thresh: 0.40 #scambiarli
 track_low_thresh: 0.05 #0.05
 tracker_type: botsort
-with_reid: true # use reidentification
+with_reid: false # use reidentification
