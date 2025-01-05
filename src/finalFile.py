@@ -1,3 +1,5 @@
+# support file for the classification
+
 def init(data, id):
     prs={"id" : id,
     "gender" : [],

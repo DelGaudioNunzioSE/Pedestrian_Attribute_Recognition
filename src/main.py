@@ -18,6 +18,7 @@ from Tracking.SupportScripts.crossingDirection import calculate_crossing
 from Tracking.SupportScripts.crossing import do_intersect#, orientation, on_segment
 from Tracking.SupportScripts.configurationReading import getPoints
 from Tracking.SupportScripts.drowLine import drawLine, line_dict
+from Classifier.classifier import CNNWithAttention
 
 
 
@@ -63,8 +64,8 @@ class CLAHE:
         return Image.fromarray(img_rgb)
 
 transform = transforms.Compose([
-    #transforms.Resize((90, 200)),
     transforms.Resize((224, 224)),
+    
     CLAHE(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -90,7 +91,7 @@ def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.3, window_size=30):
+def has_hat_peak(probabilities, threshold=0.4, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -234,9 +235,9 @@ def my_track(video_path, tracker):
                         hat_pred = torch.sigmoid(hat[id.item()])
                         bag_pred = torch.sigmoid(bag[id.item()]) #0.3
                     else:
-                        gender_pred = torch.sigmoid(torch.tensor(0))  #0.4
-                        hat_pred = torch.sigmoid(torch.tensor(0))
-                        bag_pred = torch.sigmoid(torch.tensor(0)) #0.3
+                        gender_pred = torch.tensor(0.2)  #0.4
+                        hat_pred = torch.tensor(0.2)
+                        bag_pred = torch.tensor(0.2)
                     
 
                    
@@ -381,7 +382,7 @@ final = {
     "people" : []
 }
 
-video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
+video_path = './src/Tracking/videos/video.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
 #test_path='./src/Tracking/videos/Atrio.mp4'
