@@ -39,6 +39,7 @@ lines ={
 }
 
 MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
+NEURONS = 512
 
 
 
@@ -148,7 +149,7 @@ def my_track(video_path, tracker):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention(hidden_dim=512)   
+    classifier_model = CNNWithAttention(hidden_dim=NEURONS)   
     checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
