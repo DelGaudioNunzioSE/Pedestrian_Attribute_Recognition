@@ -6,6 +6,7 @@ src/Classifier/Datasets/
 !src/Classifier/Datasets/training_set.csv
 !src/Classifier/Datasets/validation_set.csv
 src/Classifier/Models/*
+src/Classifier/classifierTest.py
 *.mp4
 *.png
 *.jpg

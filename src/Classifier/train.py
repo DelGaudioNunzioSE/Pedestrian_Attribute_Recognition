@@ -18,7 +18,7 @@ from torch.optim.lr_scheduler import CyclicLR
 
 # OUR IMPORTS
 from SupportScripts.checkpoint import checkpoint_fuction
-from classifier import CNNWithAttention
+from classifierTest import CNNWithAttention2
 from SupportScripts.adjustedLoss import adjustedLoss, total_loss_fuction
 from SupportScripts.tester import Tester
 from SupportScripts.device import device_selecter
@@ -28,8 +28,8 @@ DEVICE=device_selecter()
 STARTING_TRAIN_TIME_STAMP= timestamp = datetime.now().strftime('%d_%H%M')
 
 # Setup #########################################################################
-LEARNING_COMMENT = '_repropose'
-NUMBER_OF_NEURONS=int(512) 
+LEARNING_COMMENT = '_7ciriprovo'
+NUMBER_OF_NEURONS=int(512/2) 
 TIMESTAMP = False
 MODEL_PATH=None # if you wanto to start from a previous model
 
@@ -47,7 +47,7 @@ VALIDATION = True # if we have to compute validaton too
 
 BATCH_SIZE = int(256) #Reduce if you have GPU's memory problems
 VALIDATION_SIZE = 0.1
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.00001
 NUM_EPOCHS = 15
 GENDER_LOSS_WEIGHT = 0.3
 BAG_LOSS_WEIGHT = 0.4
@@ -83,14 +83,14 @@ if IMAGE_TYPE=='RGB':
         transforms.Resize((224, 224)),  # Resize all images to a uniform size
         transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0),
         transforms.RandomRotation(degrees=(-5, 5)),
-        CLAHE(),
+        #CLAHE(),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
 
     VAL_TRANSFORMS = transforms.Compose([
         transforms.Resize((224, 224)),
-        CLAHE(),
+        #CLAHE(), # to simulate the same 'normalization'
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -137,7 +137,7 @@ data_valid = DataLoader(dataset_valid, batch_size=BATCH_SIZE)
 ##### MODEL ######################################
 ####################################################
 # Model creation
-model = CNNWithAttention(channel=IMAGE_TYPE, hidden_dim=NUMBER_OF_NEURONS)   
+model = CNNWithAttention2()   
 model.to(DEVICE)
 
 

@@ -16,6 +16,7 @@ from Tracking.SupportScripts.crossingDirection import calculate_crossing
 from Tracking.SupportScripts.crossing import do_intersect#, orientation, on_segment
 from Tracking.SupportScripts.configurationReading import getPoints
 from Tracking.SupportScripts.drowLine import drawLine, line_dict
+from Classifier.classifierTest import CNNWithAttention2
 
 
 
@@ -36,7 +37,7 @@ lines ={
     
 }
 
-MODEL = "HistogramEqualization_512_neurons_7_01_0818.pth"
+MODEL = "_ciriprovo_1_try.pth"
 
 
 
@@ -69,7 +70,7 @@ transform = transforms.Compose([
 
 
 #Christian hack###########################################################
-def has_gender_peak(probabilities, threshold=0.6, window_size=20):
+def has_gender_peak(probabilities, threshold=0.35, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -82,13 +83,13 @@ def has_bag_peak(probabilities, threshold=0.5, window_size=30):
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
     recent_probs = np.array(recent_probs)  # Converte la lista in un array NumPy
-    recent_probs[recent_probs > 0.3] *= 2
+    #recent_probs[recent_probs > 0.3] *= 2
     avg_prob = sum(recent_probs) / len(recent_probs)
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
     
-def has_hat_peak(probabilities, threshold=0.3, window_size=30):
+def has_hat_peak(probabilities, threshold=0.5, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
@@ -131,7 +132,7 @@ def my_track(video_path, tracker):
 
     # Load YOLO model with weights onto the selected device
     model = YOLO('./src/Tracking/yolov8m.pt')
-    classifier_model = CNNWithAttention(hidden_dim=512)   
+    classifier_model = CNNWithAttention2()   
     checkpoint = torch.load('./src/Classifier/Models/'+MODEL)
     classifier_model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)  # Move the model to the selected device
