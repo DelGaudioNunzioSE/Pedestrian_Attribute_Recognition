@@ -13,14 +13,14 @@ def main():
 
 
     # Parametri per test1
-    x_real = np.array([-2.5, 0.5, 0.5, 4.6])
-    y_real = np.array([13.41, 8.00, 13.00, 10.91])
+    x_real = np.array([0.5, -2.5, 0.5, 4.6])
+    y_real = np.array([13, 13.40, 8, 10.91])
     z_real = np.zeros_like(x_real)
     xt= 0
     yt= 0
     zt= 7.20  # Room coordinates
     thyaw = 0* np.pi / 180  # Z
-    thpitch = (((360-32) * np.pi) / 180)  # X
+    thpitch = -0.558  # X
     throll = 0 * np.pi / 180  # Y
     f = 0.003  # Focal distance (m)
 

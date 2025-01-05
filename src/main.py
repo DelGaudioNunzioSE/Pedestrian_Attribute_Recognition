@@ -9,6 +9,8 @@ from Classifier.classifier import CNNWithAttention
 from PIL import Image, ImageOps
 
 from finalFile import * #per il file finale
+import time
+
 
 # our imports
 from Tracking.SupportScripts.init import init
@@ -69,7 +71,6 @@ transform = transforms.Compose([
 ])
 
 
-#Christian hack###########################################################
 def has_gender_peak(probabilities, threshold=0.5, window_size=20):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
@@ -78,12 +79,12 @@ def has_gender_peak(probabilities, threshold=0.5, window_size=20):
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
 
-def has_bag_peak(probabilities, threshold=0.6, window_size=20):
+def has_bag_peak(probabilities, threshold=0.3, window_size=30):
     # Considera solo le ultime N predizioni
     recent_probs = probabilities[-window_size:]
     # Calcola la media delle probabilità recenti
     recent_probs = np.array(recent_probs)  # Converte la lista in un array NumPy
-    #recent_probs[recent_probs > 0.3] *= 2
+    recent_probs[recent_probs > 0.5] *= 1.2
     avg_prob = sum(recent_probs) / len(recent_probs)
     # Se la media supera la soglia, restituisce True (c'è lo zaino)
     return avg_prob > threshold
@@ -114,6 +115,21 @@ def classifier_preparer(box, frame, device):
     cropped_img = transform(cropped_img) #la trasformo per darla in input alla rete
     cropped_img = cropped_img.unsqueeze(0).to(device)
     return cropped_img
+
+def fps(video_path):
+    video_path = video_path
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print("Errore nell'apertura del video.")
+    else:
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        print(f"FPS del video: {fps:.2f}")
+    cap.release()
+    if fps < 35:
+        skip = 2
+    else:
+        skip = 4
+    return skip
 ####################################################################################
 
 
@@ -128,6 +144,7 @@ def my_track(video_path, tracker):
         device = torch.device("cpu")
 
     print(f"Using device: {device}")
+    start = time.time()
 
 
     # Load YOLO model with weights onto the selected device
@@ -155,6 +172,7 @@ def my_track(video_path, tracker):
     # max_det -> Maximum number of detections per image
     # persist -> True to keep tracking between frames (afther desappear and reappear the object must mantain the same ID)
     # half -> True to use half precision (faster but less accurate)
+    
     results = model.track(device = device, verbose= False, source=video_path, show=False, tracker=tracker, 
                           stream=True, classes=0, imgsz = (1080,1920), vid_stride=7, conf=0.3
                           ,iou = 0.8, max_det=30, persist=True, half=True)
@@ -163,12 +181,14 @@ def my_track(video_path, tracker):
     #1920x1080 riesce a prendersi il ragazzo dietro
     #ma forse possiamo usare 1280x720 e recuperarlo col detector
     #half migliora la velocità anche se abbassa un pò l'accuracy
+    #60 frames
 
 
     # Prendo image prima solo per disegnare le linee
     
     
     points,lines=getPoints()
+    skip = fps(video_path)
     
     gender={}
     hat={}
@@ -178,9 +198,11 @@ def my_track(video_path, tracker):
     line_height = 20
     trajectory=(len(points)//2) #number of lines
 
+    
+
     # Iteration on the detector frames
     for i,result in enumerate(results):
-        if(i%2==0):
+        if(i%1==0):
             frame = result.orig_img.copy()
             frame_original = result.orig_img  #origin frame without box
             traj=0
@@ -199,7 +221,13 @@ def my_track(video_path, tracker):
                     # Classificazioni (gender, hat, bag)
                     #(vid stride 8/ 2 primo if/ 5 secondo if) 71 sec
                     #(vid stride 8/ 2 primo if/ 5 secondo if) 76 sec
-                    if(i%3==0):
+                    #(vid stride 7/ 2 primo if/ 5 secondo if) 63 sec chris, perso 1 e recuperato 1 = pari
+                    if(i%skip==0):
+                        #0.2 sec per 10 box = 200ms / senza modello 0.02ms
+                        #0.065 sec for senza modello = 65 ms
+                        #265 ms
+                        #45ms
+                        #quindi posso elaborare 1000/240 = 5 frames
                         gender[id.item()], bag[id.item()], hat[id.item()] = classifier_model(img)
                     if(id.item() in gender):
                         gender_pred = torch.sigmoid(gender[id.item()])  #0.4
@@ -209,6 +237,7 @@ def my_track(video_path, tracker):
                         gender_pred = torch.sigmoid(torch.tensor(0))  #0.4
                         hat_pred = torch.sigmoid(torch.tensor(0))
                         bag_pred = torch.sigmoid(torch.tensor(0)) #0.3
+                    
 
                    
                     # Disegna il bounding box sul frame
@@ -228,7 +257,7 @@ def my_track(video_path, tracker):
                         for line in lines:
                             if(do_intersect(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["p1"],line_dict["line"][line["id"]]["p2"])):
                                 if(calculate_crossing(person["xyxy"],(x1,x2,y1,y2),line_dict["line"][line["id"]]["center"],line_dict["line"][line["id"]]["arrowEnd"])):
-                                    traj=line["id"]
+                                     traj=line["id"]
                        
 
                     
@@ -273,7 +302,7 @@ def my_track(video_path, tracker):
 
                         # add a new person's trajectory (if the person is crossing a new line)
                         if(len(person["trajectory"])>0):
-                            if(person["trajectory"][-1]!=traj and traj!=0):
+                            if(person["trajectory"][-1]!=0 and traj!=0): #if(person["trajectory"][-1]!=traj and traj!=0):
                                 person["trajectory"].append(traj)
                                 final_f["people"][int(id.item()-1)]["trajectory"].append(traj)
                         elif traj!=0:
@@ -336,11 +365,16 @@ def my_track(video_path, tracker):
             # Mostra il frame con i risultati
             frame= cv2.resize(frame,(1280,720))
             cv2.imshow("Tracking", frame)
+
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
 
     cv2.destroyAllWindows()
+    end = time.time()
+    elapsed_time = end - start
+    print(f"Tempo di esecuzione: {elapsed_time:.6f} secondi")
     return final_f
+
 
 
 final = {
@@ -350,8 +384,11 @@ final = {
 video_path = './src/Tracking/videos/Atrio.mp4' # Path to the input video file (`video_fish.mp4`)
 tracker='./src/Tracking/confs/botsort.yaml' # Path to the tracker configuration file (`botsort.yaml`)
 show=True # A boolean flag to display the processed video with tracked objects
-test_path='./src/Tracking/videos/Atrio.mp4'
+#test_path='./src/Tracking/videos/Atrio.mp4'
+
+
 final_f = my_track(video_path, tracker)
+
 
 
 file_path = './src/Tracking/videos/probs.json'
@@ -359,7 +396,6 @@ with open(file_path, 'w', encoding='utf-8') as file:
     json.dump(probs, file, indent=4, ensure_ascii=False)  # indent=4 per rendere leggibile, ensure_ascii=False per caratteri non ASCII
     print(f"File salvato in {file_path}")
 
-print(final_f)
 final = classify(final_f)
 file_path = './src/Tracking/videos/results.txt'
 with open(file_path, 'w', encoding='utf-8') as file:
