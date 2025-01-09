@@ -1,14 +1,16 @@
-# Real-Time Video Analysis Pipeline 
+# Artificial Vision Project: PAR (pedestrian attribute recognition) 
 
 ## About this Repository 
 
-Welcome to the repository for our university competition project! This challenge involves creating a complete pipeline for **real-time video analysis**. The main objectives of the project are:
+This univeristy project involves creating a complete pipeline for real-time video analysis **PAR** . The main objectives of the project are:
 
 - **Detecting people** 
 - **Identifying attributes of individuals**, such as:
   - Gender 🧑
   - Whether they are wearing a hat or not 🎩
   - Whether they are carrying a backpack 🎒
+
+  ![example.png]
 
 ## Rules and Requirements 
 
