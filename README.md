@@ -10,7 +10,7 @@ This univeristy project involves creating a complete pipeline for real-time vide
   - Whether they are wearing a hat or not 🎩
   - Whether they are carrying a backpack 🎒
 
-  ![example.png]
+  !(example.png)
 
 ## Rules and Requirements 
 
