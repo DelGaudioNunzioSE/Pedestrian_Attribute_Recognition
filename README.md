@@ -9,6 +9,7 @@ This univeristy project involves creating a complete pipeline for real-time vide
   - Gender 🧑
   - Whether they are wearing a hat or not 🎩
   - Whether they are carrying a backpack 🎒
+- **Indicate which lines cross hato **
 
 ![example](https://github.com/user-attachments/assets/9f1b4dcf-1c5c-4247-876c-968807ce4196)
 
